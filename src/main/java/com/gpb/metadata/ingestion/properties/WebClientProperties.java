@@ -12,7 +12,7 @@ import lombok.Setter;
 @Setter
 public class WebClientProperties {
     private String baseUrl;
-
+    private Ssl ssl = new Ssl();
     private Endpoints endpoints = new Endpoints();
     
     @Getter
@@ -21,6 +21,19 @@ public class WebClientProperties {
         private String database = "/databases";
         private String schema = "/databaseSchemas";
         private String table = "/tables";
+    }
+    
+    @Getter
+    @Setter
+    public static class Ssl {
+        private boolean enabled = true;
+        private String keyStorePath;
+        private String keyStorePassword;
+        private String keyStoreType = "PKCS12";
+        private String keyPassword;
+        private String trustStorePath;
+        private String trustStorePassword;
+        private boolean insecureTrustManager = false;
     }
     
     // Методы для конкретных endpoints (возвращают только путь)
