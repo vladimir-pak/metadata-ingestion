@@ -1,0 +1,116 @@
+# application.yml
+
+spring:
+  application:
+    name: metadata-ingestion
+    version: 0.0.1-SNAPSHOT
+    dpt: 912044
+    dntdom: GPB
+    user: test_user
+
+  datasource:
+    url: jdbc:postgresql://localhost:5432/replication?currentSchema=postgres_metadata
+    username: ssdq
+    password: ssdq_pass
+    driverClassName: org.postgresql.Driver
+    # driverClassName: org.apache.ignite.IgniteJdbcThinDriver
+    hikari:
+      maximum-pool-size: 20
+      connection-timeout: 30000
+      idle-timeout: 600000
+      max-lifetime: 1800000
+      pool-name: TargetDBPool
+
+  jpa:
+    hibernate:
+      ddl-auto: none
+    show-sql: true
+    properties:
+      hibernate:
+        default_schema: postgres_metadata
+        dialect: org.hibernate.dialect.PostgreSQLDialect
+        jdbc:
+          lob:
+            non_contextual_creation: true
+        temp:
+          use_jdbc_metadata_defaults: false
+
+  flyway:
+    schemas: postgres_metadata
+    enabled: true
+    locations: classpath:db/migration
+    url: jdbc:postgresql://localhost:5432/replication?currentSchema=postgres_metadata
+    user: ssdq
+    password: ssdq_pass
+
+  tomcat:
+    max-connections: 100 # Максимальное количество соединений
+    accept-count: 100 # Максимальное количество потоков
+    threads:
+      max: 50 # Размер очереди запросов
+
+ingestion:
+  node-port: 1080
+  jdbc-host: localhost
+  jdbc-port: 5000
+  
+
+ignite:
+  enabled: true
+  instance-name: metadataIngestionInstance
+  client-mode: true
+  peerClassLoadingEnabled: true
+  addresses: 127.0.0.1:47500..47509
+  localPortRange: 10
+  localPort: 47500
+  discovery:
+    addresses: 
+      - 127.0.0.1:47500
+
+jwt:
+  token: h786t2yvwjhgiougfdi7y912y3g84ygevjghdvlsiugf769838ywogu4iyrkghjk
+
+logs-database:
+  enabled: true
+  task-create-partition: 0 0 0 * * ?
+  url: jdbc:postgresql://localhost:5432/log_db
+  username: ssdq
+  password: ssdq_pass
+  driverClassName: org.postgresql.Driver
+
+clean-database-logs:
+  # cron expression, to switch off put value '-'
+  task-cleaner-schedule: 0 0 1 * * ?
+  # delete logs from db that older than X years
+  clean-period: 3
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,metrics,info
+    endpoint:
+      health:
+        show-details: always
+    metrics:
+      export:
+        prometheus:
+          enabled: true
+
+logging:
+  level:
+    root: INFO
+    org.hibernate.SQL: DEBUG
+    org.hibernate.engine.jdbc.connections.internal.DriverManagerConnectionProviderImpl: DEBUG
+    org.apache.flink: INFO
+    org.springframework.jdbc: WARN
+    com.example.flinkreplication: DEBUG
+  file:
+    name: logs/flink-replication.log
+  pattern:
+    file: "%d{yyyy-MM-dd HH:mm:ss} [%thread] %-5level %logger{36} - %msg%n"
+    console: "%d{HH:mm:ss} %-5level %logger{36} - %msg%n"
+  logback:
+    rollingpolicy:
+      max-file-size: 50MB
+      max-history: 7
