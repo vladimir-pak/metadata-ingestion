@@ -48,13 +48,7 @@ spring:
     accept-count: 100 # Максимальное количество потоков
     threads:
       max: 50 # Размер очереди запросов
-
-ingestion:
-  node-port: 1080
-  jdbc-host: localhost
-  jdbc-port: 5000
   
-
 ignite:
   enabled: true
   instance-name: metadataIngestionInstance
@@ -106,7 +100,7 @@ logging:
     org.springframework.jdbc: WARN
     com.example.flinkreplication: DEBUG
   file:
-    name: logs/flink-replication.log
+    name: logs/metadata-ingestion.log
   pattern:
     file: "%d{yyyy-MM-dd HH:mm:ss} [%thread] %-5level %logger{36} - %msg%n"
     console: "%d{HH:mm:ss} %-5level %logger{36} - %msg%n"
