@@ -16,5 +16,8 @@ public class TableMetadataDto implements MetadataDto {
     private String displayName;
     private String databaseSchema;
     private String description;
+    private String tableType;
+    private Boolean isProjectEntity;
+    private String viewDefinition;
     private List<ColumnMetadataDto> columns;
 }

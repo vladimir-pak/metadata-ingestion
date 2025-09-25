@@ -12,17 +12,15 @@ import lombok.Data;
 @Data
 @JsonIgnoreProperties(ignoreUnknown = true)
 public class TableData {
-    
-    // Обязательные поля (если нужны)
+
+    @JsonProperty("tableType")
+    private String tableType;
+
+    @JsonProperty("viewDefinition")
+    private String viewDefinition;
+
     @JsonProperty("columns")
     private List<ColumnData> columns;
-    
-    // toDo
-    /* @ JsonProperty("table_type")
-    private String tableType;
-    
-    @JsonProperty("owner")
-    private String owner; */
     
     // Для хранения всех остальных полей, которых нет в DTO
     @JsonIgnore
