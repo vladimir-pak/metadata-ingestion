@@ -18,11 +18,17 @@ public class ColumnData {
     @JsonProperty("dataType")
     private String dataType;
 
+    @JsonProperty("dataTypeDisplay")
+    private String dataTypeDisplay;
+
     @JsonProperty("dataLength")
     private String dataLength;
 
     @JsonProperty("description")
     private String description;
+
+    @JsonProperty("ordinalPosition")
+    private String ordinalPosition;
 
     @JsonProperty("constraint")
     private String constraint;

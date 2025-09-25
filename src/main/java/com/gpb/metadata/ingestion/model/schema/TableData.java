@@ -21,6 +21,9 @@ public class TableData {
 
     @JsonProperty("columns")
     private List<ColumnData> columns;
+
+    @JsonProperty("tableConstraints")
+    private List<TableConstraints> tableConstraints;
     
     // Для хранения всех остальных полей, которых нет в DTO
     @JsonIgnore

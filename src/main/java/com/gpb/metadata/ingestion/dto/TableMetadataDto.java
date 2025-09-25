@@ -2,6 +2,8 @@ package com.gpb.metadata.ingestion.dto;
 
 import java.util.List;
 
+import com.gpb.metadata.ingestion.model.schema.TableConstraints;
+
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -20,4 +22,5 @@ public class TableMetadataDto implements MetadataDto {
     private Boolean isProjectEntity;
     private String viewDefinition;
     private List<ColumnMetadataDto> columns;
+    private List<TableConstraints> tableConstraints;
 }

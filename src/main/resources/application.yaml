@@ -66,6 +66,7 @@ ord:
       database: /databases
       schema: /databaseSchemas
       table: /tables
+    max-connections: 10 # Количество параллельно выполняемых api в ОРД
 
 
 jwt:

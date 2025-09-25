@@ -50,25 +50,30 @@ public class MapperDto {
         // Преобразуем tableType
         String processedTableType = TableTypes.map(tableData.getTableType());
 
+        // Собираем атрибуты таблицы
         List<ColumnMetadataDto> columns = tableData.getColumns().stream()
-            .map(column -> {
-                // Преобразуем dataType через enum
-                String processedDataType = PostgresColumnType.map(column.getDataType());
-                // Предобработка dataLength с проверкой на обязательность заполнения с учетом dataType
-                String processedDataLength = TypesWithDataLength.getProcessedDataLength(
-                        processedDataType,
-                        column.getDataLength()
-                    );
-                
-                return ColumnMetadataDto.builder()
-                    .name(column.getName())
-                    .dataType(processedDataType)  // Обработанное значение
-                    .dataLength(processedDataLength)
-                    .description(column.getDescription())
-                    .constraint(column.getConstraint())
-                    .build();
-            })
-            .collect(Collectors.toList());
+                .map(column -> {
+                    // Преобразуем dataType через enum
+                    String processedDataType = PostgresColumnType.map(column.getDataType());
+                    // Предобработка dataLength с проверкой на обязательность заполнения с учетом dataType
+                    String processedDataLength = TypesWithDataLength.getProcessedDataLength(
+                            processedDataType,
+                            column.getDataLength()
+                        );
+                    
+                    return ColumnMetadataDto.builder()
+                        .name(column.getName())
+                        .dataType(processedDataType)  // Обработанное значение
+                        .dataTypeDisplay(column.getDataTypeDisplay())
+                        .dataLength(processedDataLength)
+                        .description(column.getDescription())
+                        .constraint(column.getConstraint())
+                        .ordinalPosition(column.getOrdinalPosition())
+                        .build();
+                })
+                .collect(Collectors.toList());
+
+        // Собираем ограничения (constraints) таблицы
 
         return TableMetadataDto.builder()
                 .name(meta.getName())
@@ -79,6 +84,7 @@ public class MapperDto {
                 .databaseSchema(meta.getParentFqn())
                 .description(meta.getDescription())
                 .columns(columns)
+                .tableConstraints(tableData.getTableConstraints())
                 .build();
     }
 }
