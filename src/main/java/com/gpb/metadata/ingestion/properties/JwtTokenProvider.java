@@ -1,4 +1,4 @@
-package com.gpb.metadata.ingestion.rest.jwt;
+package com.gpb.metadata.ingestion.properties;
 
 import java.util.*;
 

@@ -7,8 +7,8 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.web.reactive.function.client.WebClient;
 
+import com.gpb.metadata.ingestion.properties.JwtTokenProvider;
 import com.gpb.metadata.ingestion.properties.WebClientProperties;
-import com.gpb.metadata.ingestion.rest.jwt.JwtTokenProvider;
 
 @Configuration
 @EnableConfigurationProperties(WebClientProperties.class)

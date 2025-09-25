@@ -5,6 +5,7 @@ import java.util.stream.Collectors;
 
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpHeaders;
+import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.HttpClientErrorException;
 import org.springframework.web.client.HttpServerErrorException;
@@ -23,8 +24,8 @@ import com.gpb.metadata.ingestion.model.Metadata;
 import com.gpb.metadata.ingestion.model.SchemaMetadata;
 import com.gpb.metadata.ingestion.model.TableMetadata;
 import com.gpb.metadata.ingestion.model.schema.TableData;
+import com.gpb.metadata.ingestion.properties.JwtTokenProvider;
 import com.gpb.metadata.ingestion.properties.WebClientProperties;
-import com.gpb.metadata.ingestion.rest.jwt.JwtTokenProvider;
 import com.gpb.metadata.ingestion.service.MetadataHandlerService;
 
 import lombok.RequiredArgsConstructor;
@@ -51,6 +52,11 @@ public class MetadataHandlerServiceImpl implements MetadataHandlerService {
 
     @Value("${ord.api.max-connections:5}")
     private Integer maxConn;
+
+    @Async
+    public void startAsync(String serviceName) {
+        start(serviceName);
+    }
 
     @Override
     public void start(String serviceName) {
