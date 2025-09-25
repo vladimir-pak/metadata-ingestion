@@ -17,6 +17,7 @@ import com.gpb.metadata.ingestion.dto.SchemaMetadataDto;
 import com.gpb.metadata.ingestion.dto.TableMetadataDto;
 import com.gpb.metadata.ingestion.enums.Entity;
 import com.gpb.metadata.ingestion.enums.PostgresColumnType;
+import com.gpb.metadata.ingestion.enums.TypesWithDataLength;
 import com.gpb.metadata.ingestion.model.DatabaseMetadata;
 import com.gpb.metadata.ingestion.model.Metadata;
 import com.gpb.metadata.ingestion.model.SchemaMetadata;
@@ -125,11 +126,15 @@ public class MetadataHandlerServiceImpl implements MetadataHandlerService {
             .map(column -> {
                 // Преобразуем dataType через enum
                 String processedDataType = PostgresColumnType.map(column.getDataType());
+                String processedDataLength = TypesWithDataLength.getProcessedDataLength(
+                        processedDataType, 
+                        column.getDataLength()
+                    );
                 
                 return ColumnMetadataDto.builder()
                     .name(column.getName())
                     .dataType(processedDataType)  // Обработанное значение
-                    .dataLength(column.getDataLength())
+                    .dataLength(processedDataLength)
                     .description(column.getDescription())
                     .constraint(column.getConstraint())
                     .build();

@@ -92,8 +92,8 @@ public enum PostgresColumnType {
     TABLE("BINARY"),
     TEXT("TEXT"),
     TIME("TIME"),
-    TIMESTAMP_WITHOUT_TZ("TIMESTAMP"),
-    TIMESTAMP_WITH_TZ("TIMESTAMP"),
+    TIMESTAMP_WITHOUT_TIME_ZONE("TIMESTAMP"),
+    TIMESTAMP_WITH_TIME_ZONE("TIMESTAMP"),
     TIME_WITH_TZ("TIME"),
     TIME_WITHOUT_TZ("TIME"),
     TIMESTAMP("TIMESTAMP"),
@@ -188,7 +188,9 @@ public enum PostgresColumnType {
     WDC_BOOL("BOOLEAN"),
     WDC_DATE("DATE"),
     WDC_GEOMETRY("GEOMETRY"),
-    CHARACTER("CHAR");
+    CHARACTER("CHAR"),
+    OID("BIGINT"),
+    NAME("VARCHAR");
 
     private final String targetType;
 
