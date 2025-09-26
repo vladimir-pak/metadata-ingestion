@@ -2,7 +2,7 @@ package com.gpb.metadata.ingestion.repository;
 
 import org.springframework.stereotype.Repository;
 
-import com.gpb.metadata.ingestion.model.DatabaseMetadata;
+import com.gpb.metadata.ingestion.model.postgres.DatabaseMetadata;
 
 import java.util.List;
 

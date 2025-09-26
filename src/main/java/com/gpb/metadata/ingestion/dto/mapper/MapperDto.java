@@ -13,10 +13,10 @@ import com.gpb.metadata.ingestion.enums.Entity;
 import com.gpb.metadata.ingestion.enums.PostgresColumnType;
 import com.gpb.metadata.ingestion.enums.TableTypes;
 import com.gpb.metadata.ingestion.enums.TypesWithDataLength;
-import com.gpb.metadata.ingestion.model.DatabaseMetadata;
 import com.gpb.metadata.ingestion.model.Metadata;
-import com.gpb.metadata.ingestion.model.SchemaMetadata;
-import com.gpb.metadata.ingestion.model.TableMetadata;
+import com.gpb.metadata.ingestion.model.postgres.DatabaseMetadata;
+import com.gpb.metadata.ingestion.model.postgres.SchemaMetadata;
+import com.gpb.metadata.ingestion.model.postgres.TableMetadata;
 import com.gpb.metadata.ingestion.model.schema.TableData;
 
 @Configuration

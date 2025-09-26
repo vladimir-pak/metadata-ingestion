@@ -4,12 +4,14 @@ import java.util.Arrays;
 
 import org.apache.ignite.Ignite;
 import org.apache.ignite.Ignition;
+import org.apache.ignite.cluster.ClusterState;
 import org.apache.ignite.configuration.DataRegionConfiguration;
 import org.apache.ignite.configuration.DataStorageConfiguration;
 import org.apache.ignite.configuration.IgniteConfiguration;
 import org.apache.ignite.spi.communication.tcp.TcpCommunicationSpi;
 import org.apache.ignite.spi.discovery.tcp.TcpDiscoverySpi;
 import org.apache.ignite.spi.discovery.tcp.ipfinder.vm.TcpDiscoveryVmIpFinder;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -18,50 +20,65 @@ import org.springframework.context.annotation.Configuration;
 @EnableConfigurationProperties
 public class IgniteConfig {
 
+    @Value("{ignite.persistence.storagePath:/ignite-storage/db}")
+    private String persistenceStoragePath;
+
+    @Value("{ignite.persistence.walPath:/ignite-storage/wal}")
+    private String persistenceWalPath;
+
+    @Value("{ignite.persistence.walArchivePath:/ignite-storage/wal-archive}")
+    private String persistenceWalArchivePath;
+
     @Bean(name = "igniteInstance", destroyMethod = "close")
     public Ignite igniteInstance() {
         IgniteConfiguration cfg = new IgniteConfiguration();
-        
+
         // Основные настройки
         cfg.setIgniteInstanceName("metadata-ingestion-cache");
         cfg.setPeerClassLoadingEnabled(true);
-        cfg.setClientMode(false); // Лучше использовать false для standalone
-        
-        // ПРАВИЛЬНАЯ конфигурация памяти для Ignite 2.17.0
+        cfg.setClientMode(false);
+
+        // Конфигурация хранилища
         DataStorageConfiguration storageCfg = new DataStorageConfiguration();
-        
-        // Создаем регион памяти (правильный синтаксис)
+
+        // Создаем регион памяти с persistence
         DataRegionConfiguration dataRegionConfig = new DataRegionConfiguration();
         dataRegionConfig.setName("Default_Region");
-        dataRegionConfig.setInitialSize(100L * 1024 * 1024); // 100 MB (long)
-        dataRegionConfig.setMaxSize(512L * 1024 * 1024); // 512 MB (long)
-        dataRegionConfig.setPersistenceEnabled(false); // Чисто in-memory
-        
-        // Устанавливаем регион по умолчанию (ИСПРАВЛЕНО)
+        dataRegionConfig.setInitialSize(1L * 1024 * 1024 * 1024); // 1 GB
+        dataRegionConfig.setMaxSize(4L * 1024 * 1024 * 1024); // 4 GB
+        dataRegionConfig.setPersistenceEnabled(true); // Включаем persistence
+
+        // Устанавливаем регион по умолчанию
         storageCfg.setDefaultDataRegionConfiguration(dataRegionConfig);
+
+        // Папка для хранения данных Ignite
+        storageCfg.setStoragePath(persistenceStoragePath);
+        storageCfg.setWalPath(persistenceWalPath);
+        storageCfg.setWalArchivePath(persistenceWalArchivePath);
+
         cfg.setDataStorageConfiguration(storageCfg);
-        
-        // Упрощенная настройка discovery
+
+        // Discovery SPI (локальный кластер)
         TcpDiscoverySpi discoverySpi = new TcpDiscoverySpi();
         TcpDiscoveryVmIpFinder ipFinder = new TcpDiscoveryVmIpFinder();
-        
-        // Используем локальный хост (ИСПРАВЛЕНО)
         ipFinder.setAddresses(Arrays.asList("127.0.0.1:47500"));
         discoverySpi.setIpFinder(ipFinder);
         discoverySpi.setJoinTimeout(3000);
         cfg.setDiscoverySpi(discoverySpi);
-        
-        // Настройка коммуникации
+
+        // Communication SPI
         TcpCommunicationSpi commSpi = new TcpCommunicationSpi();
         commSpi.setLocalPort(47100);
         cfg.setCommunicationSpi(commSpi);
-        
-        // Настройки таймаутов
+
         cfg.setNetworkTimeout(5000);
-        
-        // Отключаем лишние функции
         cfg.setMetricsLogFrequency(0);
-        
-        return Ignition.start(cfg);
+
+        Ignite ignite = Ignition.start(cfg);
+
+        // ВАЖНО: активация кластера при persistence
+        ignite.cluster().state(ClusterState.ACTIVE);
+
+        return ignite;
     }
 }

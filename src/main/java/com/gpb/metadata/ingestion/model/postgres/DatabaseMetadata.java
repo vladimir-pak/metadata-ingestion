@@ -1,9 +1,12 @@
-package com.gpb.metadata.ingestion.model;
+package com.gpb.metadata.ingestion.model.postgres;
 
 import java.time.LocalDateTime;
 
 import org.springframework.data.annotation.CreatedDate;
 import org.springframework.data.jpa.domain.support.AuditingEntityListener;
+
+import com.gpb.metadata.ingestion.model.EntityId;
+import com.gpb.metadata.ingestion.model.Metadata;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.EmbeddedId;

@@ -4,7 +4,7 @@ import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 
 import com.gpb.metadata.ingestion.model.EntityId;
-import com.gpb.metadata.ingestion.model.SchemaMetadata;
+import com.gpb.metadata.ingestion.model.postgres.SchemaMetadata;
 
 import lombok.extern.slf4j.Slf4j;
 

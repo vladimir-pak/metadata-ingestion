@@ -4,9 +4,11 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+import com.gpb.metadata.ingestion.dto.RequestBodyDto;
 import com.gpb.metadata.ingestion.service.MetadataHandlerService;
 
 import io.swagger.v3.oas.annotations.Operation;
@@ -24,10 +26,10 @@ public class CacheController {
 
     @PostMapping("/start/{serviceName}")
     @Operation(summary = "Запуск приема метаданных по наименованию сервиса")
-    public ResponseEntity<String> start(@PathVariable String serviceName) {
+    public ResponseEntity<String> start(@RequestBody RequestBodyDto body) {
         try {
-            metadataHandlerService.startAsync(serviceName);
-            return ResponseEntity.ok(String.format("Ingestion for %s added to queue", serviceName));
+            metadataHandlerService.startAsync(body.getServiceName());
+            return ResponseEntity.ok(String.format("Ingestion for %s added to queue", body.getServiceName()));
         } catch (IllegalArgumentException e) {
             return ResponseEntity.badRequest().body(e.getMessage());
         } catch (Exception e) {

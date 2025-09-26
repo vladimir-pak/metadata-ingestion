@@ -1,4 +1,4 @@
-package com.gpb.metadata.ingestion.model;
+package com.gpb.metadata.ingestion.model.postgres;
 
 import java.time.LocalDateTime;
 
@@ -11,6 +11,8 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.gpb.metadata.ingestion.model.EntityId;
+import com.gpb.metadata.ingestion.model.Metadata;
 import com.gpb.metadata.ingestion.model.schema.TableData;
 
 import jakarta.persistence.Column;

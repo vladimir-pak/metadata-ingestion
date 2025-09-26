@@ -1,7 +1,7 @@
 package com.gpb.metadata.ingestion.service.impl;
 
 import com.gpb.metadata.ingestion.enums.Entity;
-import com.gpb.metadata.ingestion.model.DatabaseMetadata;
+import com.gpb.metadata.ingestion.model.postgres.DatabaseMetadata;
 import com.gpb.metadata.ingestion.repository.DatabaseMetadataCacheRepository;
 import com.gpb.metadata.ingestion.service.AbstractMetadataCacheService;
 
