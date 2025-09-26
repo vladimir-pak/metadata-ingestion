@@ -2,7 +2,6 @@ package com.gpb.metadata.ingestion.controller;
 
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -21,7 +20,6 @@ import lombok.RequiredArgsConstructor;
 @Tag(name = "ingestion", description = "API запуска приема метаданных")
 public class CacheController {
 
-    // private DatabaseMetadataCacheServiceImpl cacheService;
     private final MetadataHandlerService metadataHandlerService;
 
     @PostMapping("/start/{serviceName}")
