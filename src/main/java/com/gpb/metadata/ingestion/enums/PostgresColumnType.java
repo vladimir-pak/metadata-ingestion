@@ -3,7 +3,7 @@ package com.gpb.metadata.ingestion.enums;
 import java.util.HashMap;
 import java.util.Map;
 
-public enum PostgresColumnType {
+public enum PostgresColumnType implements OrdaColumnTypeMapper{
     ARRAY("ARRAY"),
     BIGINT("BIGINT"),
     BIGNUMERIC("NUMERIC"),

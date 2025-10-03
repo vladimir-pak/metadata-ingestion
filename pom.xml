@@ -83,6 +83,16 @@
 			<artifactId>ignite-spring</artifactId>
 			<version>${ignite.version}</version>
 		</dependency>
+		<dependency>
+			<groupId>org.apache.ignite</groupId>
+			<artifactId>ignite-indexing</artifactId>
+			<version>${ignite.version}</version>
+		</dependency>
+		<dependency>
+			<groupId>com.h2database</groupId>
+			<artifactId>h2</artifactId>
+			<version>1.4.197</version>
+		</dependency>
 
 		<!-- <dependency>
 			<groupId>org.apache.ignite</groupId>

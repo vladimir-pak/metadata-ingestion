@@ -30,11 +30,11 @@ public enum TableTypes {
     }
 
     public static String map(String source) {
-        if (!source.isEmpty()) {
-            TableTypes mapping = LOOKUP.get(source.toUpperCase());
-        return mapping != null ? mapping.getTargetType() : "UNKNOWN";
-        } else {
-            return source;
+        if (source == null || source.isEmpty()) {
+            return "UNKNOWN";
         }
+        return Optional.ofNullable(LOOKUP.get(source.toUpperCase()))
+                .map(TableTypes::getTargetType)
+                .orElse("UNKNOWN");
     }
 }

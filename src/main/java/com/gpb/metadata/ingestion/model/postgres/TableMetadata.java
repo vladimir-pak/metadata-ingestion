@@ -29,12 +29,15 @@ import lombok.Data;
 public class TableMetadata implements Metadata {
     @EmbeddedId
     private EntityId id;
-    
+
     @Column(name = "fqn")
     private String fqn;
 
     @Column(name = "db_name")
     private String dbName;
+
+    @Column(name = "schema_name")
+    private String schemaName;
 
     @Column(name = "description")
     private String description;

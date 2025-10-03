@@ -20,13 +20,13 @@ import org.springframework.context.annotation.Configuration;
 @EnableConfigurationProperties
 public class IgniteConfig {
 
-    @Value("{ignite.persistence.storagePath:/ignite-storage/db}")
+    @Value("${ignite.persistence.storagePath:/ignite-storage/db}")
     private String persistenceStoragePath;
 
-    @Value("{ignite.persistence.walPath:/ignite-storage/wal}")
+    @Value("${ignite.persistence.walPath:/ignite-storage/wal}")
     private String persistenceWalPath;
 
-    @Value("{ignite.persistence.walArchivePath:/ignite-storage/wal-archive}")
+    @Value("${ignite.persistence.walArchivePath:/ignite-storage/wal-archive}")
     private String persistenceWalArchivePath;
 
     @Bean(name = "igniteInstance", destroyMethod = "close")
@@ -42,11 +42,19 @@ public class IgniteConfig {
         DataStorageConfiguration storageCfg = new DataStorageConfiguration();
 
         // Создаем регион памяти с persistence
-        DataRegionConfiguration dataRegionConfig = new DataRegionConfiguration();
-        dataRegionConfig.setName("Default_Region");
-        dataRegionConfig.setInitialSize(1L * 1024 * 1024 * 1024); // 1 GB
-        dataRegionConfig.setMaxSize(4L * 1024 * 1024 * 1024); // 4 GB
-        dataRegionConfig.setPersistenceEnabled(true); // Включаем persistence
+//        DataRegionConfiguration dataRegionConfig = new DataRegionConfiguration();
+//        dataRegionConfig.setName("Default_Region");
+//        dataRegionConfig.setInitialSize(1L * 1024 * 1024 * 1024); // 1 GB
+//        dataRegionConfig.setMaxSize(4L * 1024 * 1024 * 1024); // 4 GB
+//        dataRegionConfig.setPersistenceEnabled(true); // Включаем persistence
+
+        DataRegionConfiguration dataRegionConfig = new DataRegionConfiguration()
+                .setName("Default_Region")
+                .setInitialSize(256L * 1024 * 1024) // 256 MB
+                .setMaxSize(512L * 1024 * 1024)     // 512 MB
+                .setPersistenceEnabled(true);
+
+
 
         // Устанавливаем регион по умолчанию
         storageCfg.setDefaultDataRegionConfiguration(dataRegionConfig);

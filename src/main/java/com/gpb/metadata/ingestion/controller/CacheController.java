@@ -1,5 +1,6 @@
 package com.gpb.metadata.ingestion.controller;
 
+import com.gpb.metadata.ingestion.properties.MetadataSchemasProperties;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -21,13 +22,29 @@ import lombok.RequiredArgsConstructor;
 public class CacheController {
 
     private final MetadataHandlerService metadataHandlerService;
+    private final MetadataSchemasProperties schemasProperties;
 
-    @PostMapping("/start/{serviceName}")
-    @Operation(summary = "Запуск приема метаданных по наименованию сервиса")
-    public ResponseEntity<String> start(@RequestBody RequestBodyDto body) {
+    @PostMapping("/start/postgres")
+    public ResponseEntity<String> startPostgres(@RequestBody RequestBodyDto body) {
+        return startInternal(schemasProperties.getPostgres(), body.getServiceName());
+    }
+
+    @PostMapping("/start/oracle")
+    public ResponseEntity<String> startOracle(@RequestBody RequestBodyDto body) {
+        return startInternal(schemasProperties.getOracle(), body.getServiceName());
+    }
+
+    @PostMapping("/start/mssql")
+    public ResponseEntity<String> startMssql(@RequestBody RequestBodyDto body) {
+        return startInternal(schemasProperties.getMssql(), body.getServiceName());
+    }
+
+    private ResponseEntity<String> startInternal(String schema, String serviceName) {
         try {
-            metadataHandlerService.startAsync(body.getServiceName());
-            return ResponseEntity.ok(String.format("Ingestion for %s added to queue", body.getServiceName()));
+            metadataHandlerService.startAsync(schema, serviceName);
+            return ResponseEntity.ok(
+                    String.format("Ingestion for %s from schema %s added to queue", serviceName, schema)
+            );
         } catch (IllegalArgumentException e) {
             return ResponseEntity.badRequest().body(e.getMessage());
         } catch (Exception e) {
@@ -35,4 +52,5 @@ public class CacheController {
                     .body("Failed to start replication: " + e.getMessage());
         }
     }
+
 }

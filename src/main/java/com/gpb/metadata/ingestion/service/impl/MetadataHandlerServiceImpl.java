@@ -44,18 +44,18 @@ public class MetadataHandlerServiceImpl implements MetadataHandlerService {
     private Integer maxConn;
 
     @Async
-    public void startAsync(String serviceName) {
-        start(serviceName);
+    public void startAsync(String schemaName, String serviceName) {
+        start(schemaName,serviceName);
     }
 
     @Override
-    public void start(String serviceName) {
+    public void start(String schemaName, String serviceName) {
         CacheComparisonResult<DatabaseMetadata> cacheDatabase = 
-            databaseCacheService.synchronizeWithDatabase(serviceName);
+            databaseCacheService.synchronizeWithDatabase(schemaName, serviceName);
         CacheComparisonResult<SchemaMetadata> cacheSchema = 
-            schemaCacheService.synchronizeWithDatabase(serviceName);
+            schemaCacheService.synchronizeWithDatabase(schemaName, serviceName);
         CacheComparisonResult<TableMetadata> cacheTable = 
-            tableCacheService.synchronizeWithDatabase(serviceName);
+            tableCacheService.synchronizeWithDatabase(schemaName, serviceName);
         
         /*
          * Добавляем сущности в порядке очередности:

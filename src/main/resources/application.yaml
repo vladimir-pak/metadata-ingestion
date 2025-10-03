@@ -10,9 +10,9 @@ spring:
     
 
   datasource:
-    url: jdbc:postgresql://localhost:5432/replication?currentSchema=postgres_metadata
+    url: jdbc:postgresql://localhost:5432/meta_base?currentSchema=postgres_metadata
     username: postgres
-    password: postgres_pass
+    password: kampus
     driverClassName: org.postgresql.Driver
     # driverClassName: org.apache.ignite.IgniteJdbcThinDriver
     hikari:
@@ -40,7 +40,7 @@ spring:
     schemas: postgres_metadata
     enabled: true
     locations: classpath:db/migration
-    url: jdbc:postgresql://localhost:5432/replication?currentSchema=postgres_metadata
+    url: jdbc:postgresql://localhost:5432/log_db
     user: postgres
     password: postgres_pass
 
@@ -52,9 +52,9 @@ spring:
 
 ignite:
   persistence:
-    storagePath: /var/lib/ignite/storage
-    walPath: /var/lib/ignite/wal
-    walArchivePath: /var/lib/ignite/wal-archive
+    storagePath: ./ignite/storage
+    walPath: ./ignite/wal
+    walArchivePath: ./ignite/wal-archive
     
 ord:
   api:
@@ -67,14 +67,11 @@ ord:
 
 
 jwt:
-  token: eyJraWQiOiJHYjM4OWEtOWY3Ni1nZGpzLWE5MmotMDI0MmJrOTQzNTYiLCJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJvcGVuLW1ldGFkYXRhLm9yZyIsInN1YiI6ImFkbWluIiwiZW1haWwiOiJhZG1pbkBvcGVubWV0YWRhdGEub3JnIiwiaXNCb3QiOmZhbHNlLCJ0b2tlblR5cGUiOiJQRVJTT05BTF9BQ0NFU1MiLCJpYXQiOjE3NTg3MjMzMjUsImV4cCI6bnVsbH0.Njco4u_A8lBVeGr-axX0WzxZG1-eXO8SrcpXyEtO_NbuFRT_AjB8Eih5X_bwzPw7xxQCcdCFl_zCVaxvp5_3SoFnXBEKX0jLHUbz8K3fllgjKvmwTQ68Dp9bA6C6OANoTUZeL3W7CtCy6x3fHVg_WSU1CK1-IDwi7LDYtcnoUgxM07lrxBeJzVP3xsIQG9MckRzyOUhvGisiQd1X6gSOj3mDx2YHb4mTztHBBL_4utlGyNT0che_zIiH7ksw0fH6sK1omxFHAf-1lBFohEDExFmiEYHERO9C73qyguuDkkV6FUpqv0GdCf6ET9s5j3fdBI_hLu8_CYdLmYskVf2BsQ
-
-logs-database:
-  enabled: true
+  token: eyJraWQiOiJHYjM4OWEtOWY3Ni1nZGpzLWE5MmotMDI0MmJrOTQzNTYiLCJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJvcGVuLW1ldGFkYXRhLm9yZyIsInN1YiI6ImFkbWluIiwiZW1haWwiOiJhZG1pbkBvcGVubWV0YWRhdGEub3JnIiwiaXNCb3QiOmZhbHNlLCJ0b2tlblR5cGUiOiJQRVJTT05BTF9BQ0NFU1MiLCJpYXQiOjE3NTk0MTkzMjEsImV4cCI6MTc1OTQyMjkyMX0.BQBPpjZEDGtH4lJloxWkRPs93MluS-PkK_CJiW-u658sJXLz131JC_PyBaP9Jvio8_o4hFCM26-DiZPfSD8m8g4aOMIVEDFDf0dEJzvTHybdOyvFHQs09vWPwy9eQb69k-BUMRIF5nqy-9Ay3YHVXwgXpjJKc_KH2SsF1XuiORd7qpEKITor-XGiOJDq1V0JvWfS2nTuwvppUbaoJu-avSW45wundIivQe8pO5Fid9xtwEFfILoq3dVDcxXnxUNizWHzD00VXMbwdm0CDGosrkc10Qy6nPK_oSceV5XM_AR4cRN2r2jA8fgEcVTgxsAPBbm41CD0xkTFPbjmfni2Bw
   task-create-partition: 0 0 0 * * ?
   url: jdbc:postgresql://localhost:5432/log_db
   username: postgres
-  password: postgres_pass
+  password: kampus
   driverClassName: org.postgresql.Driver
 
 clean-database-logs:
@@ -113,3 +110,9 @@ logging:
     rollingpolicy:
       max-file-size: 50MB
       max-history: 7
+
+metadata:
+  schemas:
+    postgres: postgres_metadata
+    mssql: mssql_metadata
+    oracle: oracle_metadata

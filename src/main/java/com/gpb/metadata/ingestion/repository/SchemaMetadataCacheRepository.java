@@ -1,21 +1,56 @@
 package com.gpb.metadata.ingestion.repository;
 
+import com.gpb.metadata.ingestion.model.EntityId;
+import lombok.RequiredArgsConstructor;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Repository;
 
 import com.gpb.metadata.ingestion.model.postgres.SchemaMetadata;
 
+import java.sql.ResultSet;
+import java.sql.SQLException;
 import java.util.List;
 
 @Repository
-public interface SchemaMetadataCacheRepository extends MetadataRepository<SchemaMetadata> {
+@RequiredArgsConstructor
+public class SchemaMetadataCacheRepository implements MetadataRepository<SchemaMetadata>{
+
+    private final JdbcTemplate jdbcTemplate;
 
     /**
-     * Поиск всех записей по serviceName
+     * Получить все записи из нужной схемы по serviceName
      */
-    List<SchemaMetadata> findByServiceName(String serviceName);
+    public List<SchemaMetadata> findByServiceName(String schema, String serviceName) {
+        String sql = String.format("""
+            SELECT id, parent_fqn, fqn, db_name, name, service_name, hash_data, created_at
+            FROM %s.schema_metadata
+            WHERE service_name = ?
+        """, schema);
+
+        return jdbcTemplate.query(sql, this::mapRow, serviceName);
+    }
 
     /**
-     * Удаление всех записей по serviceName
+     * Удалить все записи по serviceName из нужной схемы
      */
-    void deleteByServiceName(String serviceName);
+    public void deleteByServiceName(String schema, String serviceName) {
+        String sql = String.format("DELETE FROM %s.schema_metadata WHERE service_name = ?", schema);
+        jdbcTemplate.update(sql, serviceName);
+    }
+
+    private SchemaMetadata mapRow(ResultSet rs, int rowNum) throws SQLException {
+        SchemaMetadata entity = new SchemaMetadata();
+        EntityId id = new EntityId(
+                rs.getLong("id"),
+                rs.getString("parent_fqn")
+        );
+        entity.setId(id);
+        entity.setFqn(rs.getString("fqn"));
+        entity.setDbName(rs.getString("db_name"));
+        entity.setName(rs.getString("name"));
+        entity.setServiceName(rs.getString("service_name"));
+        entity.setHashData(rs.getString("hash_data"));
+        entity.setCreatedAt(rs.getTimestamp("created_at").toLocalDateTime());
+        return entity;
+    }
 }
