@@ -1,6 +1,6 @@
 package com.gpb.metadata.ingestion.service.impl;
 
-import com.gpb.metadata.ingestion.enums.Entity;
+import com.gpb.metadata.ingestion.enums.DbObjectType;
 import com.gpb.metadata.ingestion.model.postgres.TableMetadata;
 import com.gpb.metadata.ingestion.repository.TableMetadataCacheRepository;
 import com.gpb.metadata.ingestion.service.AbstractMetadataCacheService;
@@ -15,7 +15,7 @@ public class TableMetadataCacheServiceImpl extends AbstractMetadataCacheService<
     public TableMetadataCacheServiceImpl(
             @Qualifier("igniteInstance") Ignite ignite,
             TableMetadataCacheRepository repository) {
-        super(ignite, repository, Entity.TABLE);
+        super(ignite, repository, DbObjectType.TABLE);
     }
     
     @Override

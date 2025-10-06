@@ -13,7 +13,7 @@ import org.apache.ignite.configuration.CacheConfiguration;
 import org.springframework.beans.factory.annotation.Qualifier;
 
 import com.gpb.metadata.ingestion.cache.CacheComparisonResult;
-import com.gpb.metadata.ingestion.enums.Entity;
+import com.gpb.metadata.ingestion.enums.DbObjectType;
 import com.gpb.metadata.ingestion.model.EntityId;
 import com.gpb.metadata.ingestion.model.Metadata;
 import com.gpb.metadata.ingestion.repository.MetadataRepository;
@@ -28,7 +28,7 @@ public abstract class AbstractMetadataCacheService<T extends Metadata> {
     @Qualifier("igniteInstance")
     protected final Ignite ignite;
     protected final MetadataRepository<T> repository;
-    protected final Entity entityType;
+    protected final DbObjectType dbObjectTypeType;
 
     protected final Map<String, IgniteCache<EntityId, T>> runtimeCaches = new ConcurrentHashMap<>();
     protected final String TEMP_CACHE_PREFIX = "temp_%s_";
@@ -41,7 +41,7 @@ public abstract class AbstractMetadataCacheService<T extends Metadata> {
         String cacheKey = schemaName + "_" + serviceName;
 
         return runtimeCaches.computeIfAbsent(cacheKey, key -> {
-            String cacheName = String.format(CACHE_NAME, entityType.name()) + cacheKey;
+            String cacheName = String.format(CACHE_NAME, dbObjectTypeType.name()) + cacheKey;
 
             CacheConfiguration<EntityId, T> cacheCfg = new CacheConfiguration<>();
             cacheCfg.setName(cacheName);
@@ -56,7 +56,7 @@ public abstract class AbstractMetadataCacheService<T extends Metadata> {
      * Создать временный кэш из данных БД
      */
     protected IgniteCache<EntityId, T> createTempCacheFromDatabase(String schemaName, String serviceName) {
-        String tempCacheName = String.format(TEMP_CACHE_PREFIX, entityType.name()) +
+        String tempCacheName = String.format(TEMP_CACHE_PREFIX, dbObjectTypeType.name()) +
                 schemaName + "_" + serviceName + "_" + System.currentTimeMillis();
 
         CacheConfiguration<EntityId, T> tempCacheCfg = new CacheConfiguration<>();
@@ -93,7 +93,7 @@ public abstract class AbstractMetadataCacheService<T extends Metadata> {
             findDeletedRecords(runtimeCache, tempCache, result);
 
             log.info("Comparison result for {} (schema={}): newRecords={}, modifiedRecords={}, deletedRecords={}",
-                    entityType.getName(),
+                    dbObjectTypeType.getName(),
                     schemaName,
                     result.getNewRecords().size(),
                     result.getModifiedRecords().size(),

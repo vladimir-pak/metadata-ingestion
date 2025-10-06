@@ -2,6 +2,8 @@ package com.gpb.metadata.ingestion.service.impl;
 
 import java.util.*;
 
+import com.gpb.metadata.ingestion.enums.ServiceType;
+import com.gpb.metadata.ingestion.properties.MetadataSchemasProperties;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpHeaders;
 import org.springframework.scheduling.annotation.Async;
@@ -12,7 +14,7 @@ import org.springframework.web.reactive.function.client.WebClient;
 
 import com.gpb.metadata.ingestion.cache.CacheComparisonResult;
 import com.gpb.metadata.ingestion.dto.mapper.MapperDto;
-import com.gpb.metadata.ingestion.enums.Entity;
+import com.gpb.metadata.ingestion.enums.DbObjectType;
 import com.gpb.metadata.ingestion.model.postgres.DatabaseMetadata;
 import com.gpb.metadata.ingestion.model.postgres.SchemaMetadata;
 import com.gpb.metadata.ingestion.model.postgres.TableMetadata;
@@ -39,6 +41,7 @@ public class MetadataHandlerServiceImpl implements MetadataHandlerService {
     private final WebClient webClient;
     private final JwtTokenProvider tokenProvider;
     private final WebClientProperties webClientProperties;
+    private final MetadataSchemasProperties schemasProperties;
 
     @Value("${ord.api.max-connections:5}")
     private Integer maxConn;
@@ -50,7 +53,18 @@ public class MetadataHandlerServiceImpl implements MetadataHandlerService {
 
     @Override
     public void start(String schemaName, String serviceName) {
-        CacheComparisonResult<DatabaseMetadata> cacheDatabase = 
+        final Map<String, ServiceType> schemaTypeMap = Map.of(
+                schemasProperties.getPostgres(), ServiceType.POSTGRES,
+                schemasProperties.getMssql(), ServiceType.MSSQL,
+                schemasProperties.getOracle(), ServiceType.ORACLE
+        );
+
+
+        ServiceType type = schemaTypeMap.get(schemaName);
+        if (type == null) {
+            throw new IllegalArgumentException("Неизвестный тип схемы: " + schemaName);
+        }
+        CacheComparisonResult<DatabaseMetadata> cacheDatabase =
             databaseCacheService.synchronizeWithDatabase(schemaName, serviceName);
         CacheComparisonResult<SchemaMetadata> cacheSchema = 
             schemaCacheService.synchronizeWithDatabase(schemaName, serviceName);
@@ -64,13 +78,13 @@ public class MetadataHandlerServiceImpl implements MetadataHandlerService {
          * 3. Таблицы
          */
         Collection<DatabaseMetadata> putDatabases = cacheDatabase.getPutRecords().values();
-        databasePutRequest(putDatabases, webClientProperties.getDatabaseEndpoint(), Entity.DATABASE);
+        databasePutRequest(putDatabases, webClientProperties.getDatabaseEndpoint());
 
         Collection<SchemaMetadata> putSchemas = cacheSchema.getPutRecords().values();
-        schemaPutRequest(putSchemas, webClientProperties.getSchemaEndpoint(), Entity.SCHEMA);
+        schemaPutRequest(putSchemas, webClientProperties.getSchemaEndpoint());
 
         Collection<TableMetadata> putTables = cacheTable.getPutRecords().values();
-        tablePutRequest(putTables, webClientProperties.getTableEndpoint(), Entity.TABLE);
+        tablePutRequest(putTables, webClientProperties.getTableEndpoint(), type);
 
         /*
          * Удаляем сущности в порядке очередности:
@@ -88,12 +102,12 @@ public class MetadataHandlerServiceImpl implements MetadataHandlerService {
         databaseDeleteRequest(toDeleteDatabase, webClientProperties.getDatabaseDeleteEndpoint());
     }
 
-    private void databasePutRequest(Collection<DatabaseMetadata> meta, String endpoint, Entity entity) {
+    private void databasePutRequest(Collection<DatabaseMetadata> meta, String endpoint) {
         Flux.fromIterable(meta)
                 .flatMap(value -> 
-                    putRequest(endpoint, mapperDto.getDto(entity, value), Void.class)
+                    putRequest(endpoint, mapperDto.getDto(DbObjectType.DATABASE, value, null), Void.class)
                         .doOnSuccess(response -> 
-                            log.info("Успешно создано/обновлено {}: {}", entity.name().toLowerCase(), value.getFqn())
+                            log.info("Успешно создано/обновлено {}: {}", DbObjectType.DATABASE.name().toLowerCase(), value.getFqn())
                         )
                         .doOnError(error -> 
                             log.error("Ошибка при создании/обновлении {}: {}", value.getFqn(), error.getMessage())
@@ -122,12 +136,12 @@ public class MetadataHandlerServiceImpl implements MetadataHandlerService {
                 .block(); // Ждем завершения всех
     }
 
-    private void schemaPutRequest(Collection<SchemaMetadata> meta, String endpoint, Entity entity) {
+    private void schemaPutRequest(Collection<SchemaMetadata> meta, String endpoint) {
         Flux.fromIterable(meta)
                 .flatMap(value -> 
-                    putRequest(endpoint, mapperDto.getDto(entity, value), Void.class)
+                    putRequest(endpoint, mapperDto.getDto(DbObjectType.SCHEMA, value, null), Void.class)
                         .doOnSuccess(response -> 
-                            log.info("Успешно создано/обновлено {}: {}", entity.name().toLowerCase(), value.getFqn())
+                            log.info("Успешно создано/обновлено {}: {}", DbObjectType.SCHEMA.name().toLowerCase(), value.getFqn())
                         )
                         .doOnError(error -> 
                             log.error("Ошибка при создании/обновлении {}: {}", value.getFqn(), error.getMessage())
@@ -156,21 +170,21 @@ public class MetadataHandlerServiceImpl implements MetadataHandlerService {
                 .block(); // Ждем завершения всех
     }
 
-    private void tablePutRequest(Collection<TableMetadata> meta, String endpoint, Entity entity) {
+    private void tablePutRequest(Collection<TableMetadata> meta, String endpoint, ServiceType serviceType) {
         Flux.fromIterable(meta)
-            .flatMap(value -> 
-                putRequest(endpoint, mapperDto.getDto(entity, value), Void.class)
-                    .doOnSuccess(response -> 
-                        log.info("Успешно создано/обновлено {}: {}", entity.name().toLowerCase(), value.getFqn())
-                    )
-                    .doOnError(error -> 
-                        log.error("Ошибка при создании/обновлении {}: {}", value.getFqn(), error.getMessage())
-                    )
-                    .onErrorResume(error -> Mono.empty()),
-                maxConn
-            )
-            .then()
-            .block();
+                .flatMap(value ->
+                                putRequest(endpoint, mapperDto.getDto(DbObjectType.TABLE, value, serviceType), Void.class)
+                                        .doOnSuccess(response ->
+                                                log.info("Успешно создано/обновлено {}: {}", DbObjectType.TABLE.name().toLowerCase(), value.getFqn())
+                                        )
+                                        .doOnError(error ->
+                                                log.error("Ошибка при создании/обновлении {}: {}", value.getFqn(), error.getMessage())
+                                        )
+                                        .onErrorResume(error -> Mono.empty()),
+                        maxConn
+                )
+                .then()
+                .block();
     }
 
     private void tableDeleteRequest(Collection<TableMetadata> meta, String endpoint) {
