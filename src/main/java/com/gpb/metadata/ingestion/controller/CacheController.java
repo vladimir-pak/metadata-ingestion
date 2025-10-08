@@ -43,7 +43,7 @@ public class CacheController {
         try {
             metadataHandlerService.startAsync(schema, serviceName);
             return ResponseEntity.ok(
-                    String.format("Ingestion for %s from schema %s added to queue", serviceName, schema)
+                    String.format("Ingestion for %s from schema %s starting", serviceName, schema)
             );
         } catch (IllegalArgumentException e) {
             return ResponseEntity.badRequest().body(e.getMessage());
