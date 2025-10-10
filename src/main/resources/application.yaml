@@ -42,7 +42,7 @@ spring:
     locations: classpath:db/migration
     url: jdbc:postgresql://localhost:5432/log_db
     user: postgres
-    password: postgres_pass
+    password: kampus
 
   tomcat:
     max-connections: 100 # Максимальное количество соединений
@@ -74,11 +74,20 @@ jwt:
   password: kampus
   driverClassName: org.postgresql.Driver
 
+logs-database:
+  enabled: true
+  task-create-partition: 0 0 0 * * ?
+  url: jdbc:postgresql://localhost:5432/log_db
+  username: postgres
+  password: kampus
+  driverClassName: org.postgresql.Driver
+
 clean-database-logs:
   # cron expression, to switch off put value '-'
   task-cleaner-schedule: 0 0 1 * * ?
   # delete logs from db that older than X years
   clean-period: 3
+
 
 management:
   endpoints:
