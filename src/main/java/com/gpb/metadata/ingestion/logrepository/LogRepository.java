@@ -1,17 +1,21 @@
 package com.gpb.metadata.ingestion.logrepository;
 
-import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Repository;
 
 import java.sql.Date;
 
-
 @Repository
-@RequiredArgsConstructor
-public class LogRepository{
+@Slf4j
+public class LogRepository {
 
     private final JdbcTemplate logsJdbcTemplate;
+
+    public LogRepository(@Qualifier("logsJdbcTemplate") JdbcTemplate logsJdbcTemplate) {
+        this.logsJdbcTemplate = logsJdbcTemplate;
+    }
 
     public Log findLatestByType(String type, String host) {
         String sql = """

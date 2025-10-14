@@ -3,6 +3,7 @@ package com.gpb.metadata.ingestion.repository;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.gpb.metadata.ingestion.model.EntityId;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Repository;
 
@@ -13,12 +14,14 @@ import java.sql.SQLException;
 import java.util.List;
 
 @Repository
-@RequiredArgsConstructor
 public class TableMetadataCacheRepository implements MetadataRepository<TableMetadata>{
 
+    @Qualifier("jdbcTemplate")
     private final JdbcTemplate jdbcTemplate;
 
-    /**
+    public TableMetadataCacheRepository(@Qualifier("jdbcTemplate") JdbcTemplate jdbcTemplate) {
+        this.jdbcTemplate = jdbcTemplate;
+    }    /**
      * Получить все записи по serviceName из выбранной схемы
      */
     public List<TableMetadata> findByServiceName(String schema, String serviceName) {

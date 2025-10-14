@@ -1,26 +1,28 @@
 package com.gpb.metadata.ingestion.dto.mapper;
 
 import java.util.List;
+import java.util.Optional;
 import java.util.stream.Collectors;
 
-import com.gpb.metadata.ingestion.enums.ServiceType;
+import com.gpb.metadata.ingestion.enums.*;
+import com.gpb.metadata.ingestion.model.schema.TableConstraints;
 import com.gpb.metadata.ingestion.service.impl.ColumnTypeMapperService;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.annotation.Configuration;
 
 import com.gpb.metadata.ingestion.dto.ColumnMetadataDto;
 import com.gpb.metadata.ingestion.dto.DatabaseMetadataDto;
 import com.gpb.metadata.ingestion.dto.SchemaMetadataDto;
 import com.gpb.metadata.ingestion.dto.TableMetadataDto;
-import com.gpb.metadata.ingestion.enums.DbObjectType;
-import com.gpb.metadata.ingestion.enums.TableTypes;
-import com.gpb.metadata.ingestion.enums.TypesWithDataLength;
 import com.gpb.metadata.ingestion.model.Metadata;
 import com.gpb.metadata.ingestion.model.postgres.DatabaseMetadata;
 import com.gpb.metadata.ingestion.model.postgres.SchemaMetadata;
 import com.gpb.metadata.ingestion.model.postgres.TableMetadata;
 import com.gpb.metadata.ingestion.model.schema.TableData;
 
+
+@Slf4j
 @Configuration
 @RequiredArgsConstructor
 public class MapperDto {
@@ -82,6 +84,20 @@ public class MapperDto {
                 })
                 .collect(Collectors.toList());
 
+        //Фильтрация поддерживаемых констрейнтов перед отправкой в Орду
+        List<TableConstraints> filteredConstraints = Optional.ofNullable(tableData.getTableConstraints())
+                .orElseGet(List::of)
+                .stream()
+                .filter(c -> {
+                    boolean keep = ConstraintType.isSupported(c.getConstraintType());
+                    if (!keep) {
+                        log.debug("Constraint '{}' пропущен — не поддерживается Ордой",
+                                c.getConstraintType());
+                    }
+                    return keep;
+                })
+                .collect(Collectors.toList());
+
         return TableMetadataDto.builder()
                 .name(meta.getName())
                 .displayName(meta.getName())
@@ -91,7 +107,7 @@ public class MapperDto {
                 .databaseSchema(meta.getParentFqn())
                 .description(meta.getDescription())
                 .columns(columns)
-                .tableConstraints(tableData.getTableConstraints())
+                .tableConstraints(filteredConstraints)
                 .build();
     }
 
@@ -106,5 +122,4 @@ public class MapperDto {
 
         return null;
     }
-
 }

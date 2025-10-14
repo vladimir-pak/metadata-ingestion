@@ -2,8 +2,8 @@ package com.gpb.metadata.ingestion.logrepository;
 
 import com.gpb.metadata.ingestion.properties.CleanDatabaseLogsProperties;
 import com.gpb.metadata.ingestion.properties.LogsDatabaseProperties;
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Repository;
 
@@ -12,13 +12,21 @@ import java.time.format.DateTimeFormatter;
 
 @Slf4j
 @Repository
-@RequiredArgsConstructor
 public class LogPartitionRepository {
 
     private final JdbcTemplate logsJdbcTemplate;
     private final CleanDatabaseLogsProperties cleanDatabaseLogs;
     private final LogsDatabaseProperties logsDatabaseProperties;
 
+    public LogPartitionRepository(
+            @Qualifier("logsJdbcTemplate") JdbcTemplate logsJdbcTemplate,
+            CleanDatabaseLogsProperties cleanDatabaseLogs,
+            LogsDatabaseProperties logsDatabaseProperties
+    ) {
+        this.logsJdbcTemplate = logsJdbcTemplate;
+        this.cleanDatabaseLogs = cleanDatabaseLogs;
+        this.logsDatabaseProperties = logsDatabaseProperties;
+    }
     public void createTodayPartition() {
         if (!logsDatabaseProperties.isEnabled()) {
             return;

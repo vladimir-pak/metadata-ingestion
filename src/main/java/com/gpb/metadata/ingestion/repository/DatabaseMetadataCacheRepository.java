@@ -1,7 +1,7 @@
 package com.gpb.metadata.ingestion.repository;
 
 import com.gpb.metadata.ingestion.model.EntityId;
-import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Repository;
 
@@ -12,10 +12,14 @@ import java.sql.SQLException;
 import java.util.List;
 
 @Repository
-@RequiredArgsConstructor
 public class DatabaseMetadataCacheRepository implements MetadataRepository<DatabaseMetadata>{
 
+    @Qualifier("jdbcTemplate")
     private final JdbcTemplate jdbcTemplate;
+
+    public DatabaseMetadataCacheRepository(@Qualifier("jdbcTemplate") JdbcTemplate jdbcTemplate) {
+        this.jdbcTemplate = jdbcTemplate;
+    }
 
     /**
      * Получить все записи из нужной схемы по serviceName
