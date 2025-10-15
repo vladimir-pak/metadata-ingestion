@@ -5,6 +5,7 @@ import com.gpb.metadata.ingestion.logrepository.Log;
 import com.gpb.metadata.ingestion.logrepository.LogRepository;
 import com.gpb.metadata.ingestion.properties.LogsDatabaseProperties;
 import com.gpb.metadata.ingestion.properties.SysProperties;
+import jakarta.servlet.http.HttpServletRequest;
 import lombok.extern.slf4j.Slf4j;
 import org.slf4j.MDC;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -36,6 +37,75 @@ public class SvoiCustomLogger {
         this.logsDatabaseProperties = logsDatabaseProperties;
         this.logRepository = logRepository;
     }
+
+    public void logApiCall(HttpServletRequest request, String message) {
+        try {
+            String clientIp = request.getRemoteAddr();
+            String clientHost = request.getRemoteHost();
+            int clientPort = request.getRemotePort();
+
+            SvoiJournal journal = svoiJournalFactory.getJournalSource();
+            journal.setShost(clientHost);
+            journal.setSrc(clientIp);
+            journal.setSpt(clientPort);
+
+            send("metadataSyncCall", "API Request", message, SvoiSeverityEnum.ONE, journal);
+
+        } catch (Exception e) {
+            log.error("Ошибка при логировании вызова API", e);
+        }
+    }
+
+    public void send(String deviceEventClassID, String name, String message, SvoiSeverityEnum severity, SvoiJournal journal) {
+        String localHostName;
+        String localHostAddress;
+        try {
+            localHostName = InetAddress.getLocalHost().getHostName();
+            localHostAddress = InetAddress.getLocalHost().getHostAddress();
+        } catch (UnknownHostException e) {
+            localHostName = InetAddress.getLoopbackAddress().getHostName();
+            localHostAddress = InetAddress.getLoopbackAddress().getHostAddress();
+        }
+
+        // дополним текущий journal, а не создаём новый
+        journal.setDeviceProduct(sysProperties.getName());
+        journal.setDeviceVersion(sysProperties.getVersion());
+        journal.setDpt(sysProperties.getDpt());
+        journal.setDntdom(sysProperties.getDntdom());
+        journal.setDeviceEventClassID(deviceEventClassID);
+        journal.setName(name);
+        journal.setMessage(message);
+        journal.setDhost(localHostName);
+        journal.setDvchost(localHostName);
+        journal.setDst(localHostAddress);
+        journal.setDuser(sysProperties.getUser());
+        journal.setSuser(sysProperties.getUser());
+        journal.setApp("");
+        journal.setDmac(getMacAddress());
+        journal.setSeverity(severity);
+
+        try (
+                MDC.MDCCloseable hostClosable = MDC.putCloseable("host", journal.getHostForSvoi());
+                MDC.MDCCloseable logTypeClosable = MDC.putCloseable("log_type", "audit_log");
+        ) {
+            log.info(StringUtils.replace(journal.toString(), "OmniPlatform", "ORD"));
+        }
+
+        if (!logsDatabaseProperties.isEnabled())
+            return;
+
+        Date created = new Date();
+        try {
+            created = format.parse(journal.getStart());
+        } catch (ParseException e) {
+            log.error(e.getMessage(), e);
+        }
+
+        logRepository.save(new Log(created,
+                StringUtils.replace(journal.toString(), "OmniPlatform", "ORD"),
+                deviceEventClassID));
+    }
+
     public void send(String deviceEventClassID, String name, String message, SvoiSeverityEnum severity) {
         String localHostName = "";
         String localHostAddress = "";
@@ -66,7 +136,7 @@ public class SvoiCustomLogger {
                 MDC.MDCCloseable hostClosable = MDC.putCloseable("host", svoiJournal.getHostForSvoi());
                 MDC.MDCCloseable logTypeClosable = MDC.putCloseable("log_type", "audit_log");
         ) {
-            log.info(StringUtils.replace(svoiJournal.toString(), "OmniPlatform", "CCP"));
+            log.info(StringUtils.replace(svoiJournal.toString(), "OmniPlatform", "ORD"));
         }
         if (!logsDatabaseProperties.isEnabled())
             return;
@@ -76,7 +146,7 @@ public class SvoiCustomLogger {
         } catch (ParseException e) {
             log.error(e.getMessage(), e);
         }
-        logRepository.save(new Log(created, StringUtils.replace(svoiJournal.toString(), "OmniPlatform", "CCP"), deviceEventClassID));
+        logRepository.save(new Log(created, StringUtils.replace(svoiJournal.toString(), "OmniPlatform", "ORD"), deviceEventClassID));
     }
     private String getMacAddress() {
         List<String> addresses = new ArrayList<>();

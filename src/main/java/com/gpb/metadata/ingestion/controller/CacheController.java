@@ -1,6 +1,8 @@
 package com.gpb.metadata.ingestion.controller;
 
+import com.gpb.metadata.ingestion.log.SvoiCustomLogger;
 import com.gpb.metadata.ingestion.properties.MetadataSchemasProperties;
+import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -23,19 +25,23 @@ public class CacheController {
 
     private final MetadataHandlerService metadataHandlerService;
     private final MetadataSchemasProperties schemasProperties;
+    private final SvoiCustomLogger logger;
 
     @PostMapping("/start/postgres")
-    public ResponseEntity<String> startPostgres(@RequestBody RequestBodyDto body) {
+    public ResponseEntity<String> startPostgres(@RequestBody RequestBodyDto body, HttpServletRequest request) {
+        logger.logApiCall(request, "startIngestionPostgres");
         return startInternal(schemasProperties.getPostgres(), body.getServiceName());
     }
 
     @PostMapping("/start/oracle")
-    public ResponseEntity<String> startOracle(@RequestBody RequestBodyDto body) {
+    public ResponseEntity<String> startOracle(@RequestBody RequestBodyDto body, HttpServletRequest request) {
+        logger.logApiCall(request, "startIngestionOracle");
         return startInternal(schemasProperties.getOracle(), body.getServiceName());
     }
 
     @PostMapping("/start/mssql")
-    public ResponseEntity<String> startMssql(@RequestBody RequestBodyDto body) {
+    public ResponseEntity<String> startMssql(@RequestBody RequestBodyDto body, HttpServletRequest request) {
+        logger.logApiCall(request, "startIngestionMssql");
         return startInternal(schemasProperties.getMssql(), body.getServiceName());
     }
 

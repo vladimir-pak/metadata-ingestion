@@ -14,4 +14,7 @@ public class SysProperties {
     private int dpt;
     private String dntdom;
     private String user;
+    private String ip;
+    private String host;
+    private String port;
 }

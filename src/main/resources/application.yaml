@@ -7,6 +7,9 @@ spring:
     dpt: 912044
     dntdom: GPB
     user: test_user
+    ip: test_ip
+    host: test_dns
+    port: test_port
     
 
   datasource:
