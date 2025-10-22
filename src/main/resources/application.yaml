@@ -13,9 +13,9 @@ spring:
     
 
   datasource:
-    url: jdbc:postgresql://localhost:5432/meta_base
-    username: postgres
-    password: kampus
+    url: ${DB_URL:jdbc:postgresql://localhost:5432/meta_base?currentSchema=postgres_metadata}
+    username: ${DB_USER:postgres}
+    password: ${DB_PASSWORD:kampus}
     driverClassName: org.postgresql.Driver
     # driverClassName: org.apache.ignite.IgniteJdbcThinDriver
     hikari:
@@ -112,7 +112,7 @@ logging:
     org.hibernate.engine.jdbc.connections.internal.DriverManagerConnectionProviderImpl: DEBUG
     org.apache.flink: INFO
     org.springframework.jdbc: WARN
-    com.example.flinkreplication: DEBUG
+    com.gpb.metadata.ingestion: DEBUG
   file:
     name: logs/metadata-ingestion.log
   pattern:
