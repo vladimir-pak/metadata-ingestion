@@ -9,8 +9,7 @@ spring:
     user: test_user
     ip: test_ip
     host: test_dns
-    port: test_port
-    
+    port: test_port    
 
   datasource:
     url: jdbc:postgresql://localhost:5432/meta_base
@@ -52,6 +51,27 @@ spring:
     accept-count: 100 # Максимальное количество потоков
     threads:
       max: 50 # Размер очереди запросов
+
+  # vault config
+  config:
+    import: optional:vault://
+
+  cloud:
+    vault:
+      uri: http://vault:8200
+      authentication: APPROLE
+      app-role:
+        role-id: ${VAULT_ROLE_ID}
+        secret-id: ${VAULT_SECRET_ID}
+      
+      kv:
+        enabled: true
+        backend: secret_v2_t
+        default-context: ord/src/connections
+        application-name: ""
+
+      connection-timeout: 5000
+      read-timeout: 15000
 
 ignite:
   persistence:

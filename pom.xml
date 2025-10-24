@@ -5,27 +5,14 @@
 	<parent>
 		<groupId>org.springframework.boot</groupId>
 		<artifactId>spring-boot-starter-parent</artifactId>
-		<version>3.5.5</version>
+		<version>3.5.6</version>
 		<relativePath/> <!-- lookup parent from repository -->
 	</parent>
 	<groupId>com.gpb</groupId>
 	<artifactId>metadata-ingestion</artifactId>
-	<version>0.0.2-SNAPSHOT</version>
+	<version>${app.version:0.0.1}</version>
 	<name>metadata-ingestion</name>
-	<description>Demo project for Spring Boot</description>
-	<url/>
-	<licenses>
-		<license/>
-	</licenses>
-	<developers>
-		<developer/>
-	</developers>
-	<scm>
-		<connection/>
-		<developerConnection/>
-		<tag/>
-		<url/>
-	</scm>
+	<description>Metadata ingestion application</description>
 	<properties>
 		<java.version>17</java.version>
 		<ignite.version>2.17.0</ignite.version>
@@ -53,11 +40,11 @@
 			<artifactId>spring-boot-starter-data-jpa</artifactId>
 		</dependency>
 
-		<!-- <dependency>
-			<groupId>org.springframework.boot</groupId>
-			<artifactId>spring-boot-starter-test</artifactId>
-			<scope>test</scope>
-		</dependency> -->
+		<dependency>
+			<groupId>org.springframework.cloud</groupId>
+			<artifactId>spring-cloud-starter-vault-config</artifactId>
+			<version>4.3.0</version>
+		</dependency>
 
 		<dependency>
             <groupId>org.projectlombok</groupId>
@@ -94,49 +81,6 @@
 			<version>1.4.197</version>
 		</dependency>
 
-		<!-- <dependency>
-			<groupId>org.apache.ignite</groupId>
-			<artifactId>ignite-core</artifactId>
-			<version>${ignite.version}</version>
-		</dependency>
-
-		<dependency>
-			<groupId>org.apache.ignite</groupId>
-			<artifactId>ignite-indexing</artifactId>
-			<version>${ignite.version}</version>
-		</dependency>
-
-		<dependency>
-			<groupId>org.apache.ignite</groupId>
-			<artifactId>ignite-compress</artifactId>
-			<version>${ignite.version}</version>
-		</dependency>
-		<dependency>
-			<groupId>org.apache.ignite</groupId>
-			<artifactId>ignite-spring-data-ext</artifactId>
-			<version>${ignite-spring-data.version}</version>
-		</dependency>
-		<dependency>
-			<groupId>org.apache.ignite</groupId>
-			<artifactId>ignite-spring</artifactId>
-			<version>${ignite.version}</version>
-		</dependency>
-		<dependency>
-			<groupId>org.apache.ignite</groupId>
-			<artifactId>ignite-calcite</artifactId>
-			<version>${ignite.version}</version>
-		</dependency>
-		<dependency>
-			<groupId>org.apache.ignite</groupId>
-			<artifactId>ignite-spring-boot-autoconfigure-ext</artifactId>
-			<version>1.0.0</version>
-		</dependency>
-		<dependency>
-			<groupId>org.apache.ignite</groupId>
-			<artifactId>ignite-rest-http</artifactId>
-			<version>${ignite.version}</version>
-		</dependency> -->
-
 		<!-- JSON Processing (для работы с JsonNode) -->
 		<dependency>
 			<groupId>com.fasterxml.jackson.core</groupId>
@@ -159,6 +103,38 @@
             <groupId>org.springdoc</groupId>
             <artifactId>springdoc-openapi-starter-webmvc-ui</artifactId>
             <version>2.3.0</version>
+        </dependency>
+
+		<!-- Указание точных версий без уязвимостей -->
+        <dependency>
+            <groupId>io.netty</groupId>
+            <artifactId>netty-all</artifactId>
+            <version>${netty.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>io.netty</groupId>
+            <artifactId>netty-codec</artifactId>
+            <version>${netty.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>io.netty</groupId>
+            <artifactId>netty-codec-http</artifactId>
+            <version>${netty.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>io.netty</groupId>
+            <artifactId>netty-codec-http2</artifactId>
+            <version>${netty.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.security</groupId>
+            <artifactId>spring-security-core</artifactId>
+            <version>6.5.4</version>
+        </dependency>
+        <dependency>
+            <groupId>org.apache.tomcat.embed</groupId>
+            <artifactId>tomcat-embed-core</artifactId>
+            <version>10.1.44</version>
         </dependency>
 	</dependencies>
 

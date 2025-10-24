@@ -11,10 +11,14 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 @Component
 public class JwtTokenProvider {
     
-    private final String jwtToken;
+    private String jwtToken;
     
     public JwtTokenProvider(@Value("${jwt.token}") String jwtToken) {
         this.jwtToken = jwtToken;
+    }
+
+    public void setToken(String token) {
+        this.jwtToken = token;
     }
     
     public String getToken() {
