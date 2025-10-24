@@ -13,7 +13,7 @@ public class JwtTokenProvider {
     
     private String jwtToken;
     
-    public JwtTokenProvider(@Value("${jwt.token}") String jwtToken) {
+    public JwtTokenProvider(@Value("${jwt.token:}") String jwtToken) {
         this.jwtToken = jwtToken;
     }
 
