@@ -31,17 +31,19 @@ public class LogPartitionRepository {
         if (!logsDatabaseProperties.isEnabled()) {
             return;
         }
-
+        String table = logsDatabaseProperties.getTable().trim();
         LocalDate currentDate = LocalDate.now();
-        String partitionName = String.format("postgres_replicator_log_%s",
+        String partitionName = String.format("%s_%s",
+                table,
                 currentDate.format(DateTimeFormatter.ofPattern("yyyy_MM_dd")));
 
         String sql = String.format("""
-                CREATE TABLE IF NOT EXISTS %s 
-                PARTITION OF postgres_replicator_log 
-                FOR VALUES FROM ('%s 00:00:00') TO ('%s 00:00:00')
-                """,
+            CREATE TABLE IF NOT EXISTS %s
+            PARTITION OF %s
+            FOR VALUES FROM ('%s 00:00:00') TO ('%s 00:00:00')
+            """,
                 partitionName,
+                table,
                 currentDate.format(DateTimeFormatter.ofPattern("yyyy-MM-dd")),
                 currentDate.plusDays(1).format(DateTimeFormatter.ofPattern("yyyy-MM-dd"))
         );
@@ -55,7 +57,7 @@ public class LogPartitionRepository {
         }
 
         LocalDate dateToDelete = LocalDate.now().minusYears(cleanDatabaseLogs.getCleanPeriod());
-        String partitionName = String.format("postgres_replicator_log_%d_%02d_%02d",
+        String partitionName = String.format(logsDatabaseProperties.getTable().trim() + "_%d_%02d_%02d",
                 dateToDelete.getYear(),
                 dateToDelete.getMonthValue(),
                 dateToDelete.getDayOfMonth()

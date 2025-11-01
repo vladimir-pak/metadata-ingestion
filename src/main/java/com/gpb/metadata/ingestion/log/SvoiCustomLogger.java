@@ -16,8 +16,8 @@ import java.net.InetAddress;
 import java.net.NetworkInterface;
 import java.net.SocketException;
 import java.net.UnknownHostException;
-import java.text.ParseException;
-import java.text.SimpleDateFormat;
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.*;
 
 @Component
@@ -27,7 +27,7 @@ public class SvoiCustomLogger {
     private final LogsDatabaseProperties logsDatabaseProperties;
     private final LogRepository logRepository;
     private final SvoiJournalFactory svoiJournalFactory = new SvoiJournalFactory();
-    private final SimpleDateFormat format = new SimpleDateFormat("MMM dd yyyy HH:mm:ss", Locale.getDefault());
+    private static final DateTimeFormatter formatter = DateTimeFormatter.ofPattern("dd.MM.yyyy HH:mm:ss");
 
     @Autowired
     public SvoiCustomLogger(SysProperties sysProperties,
@@ -67,7 +67,6 @@ public class SvoiCustomLogger {
             localHostAddress = InetAddress.getLoopbackAddress().getHostAddress();
         }
 
-        // дополним текущий journal, а не создаём новый
         journal.setDeviceProduct(sysProperties.getName());
         journal.setDeviceVersion(sysProperties.getVersion());
         journal.setDpt(sysProperties.getDpt());
@@ -94,16 +93,16 @@ public class SvoiCustomLogger {
         if (!logsDatabaseProperties.isEnabled())
             return;
 
-        Date created = new Date();
         try {
-            created = format.parse(journal.getStart());
-        } catch (ParseException e) {
+            LocalDateTime created = LocalDateTime.parse(journal.getStart(), formatter);
+            logRepository.save(new Log(created,
+                    StringUtils.replace(journal.toString(), "OmniPlatform", "ORD"),
+                    deviceEventClassID));
+        } catch (Exception e) {
             log.error(e.getMessage(), e);
         }
 
-        logRepository.save(new Log(created,
-                StringUtils.replace(journal.toString(), "OmniPlatform", "ORD"),
-                deviceEventClassID));
+
     }
 
     public void send(String deviceEventClassID, String name, String message, SvoiSeverityEnum severity) {
@@ -140,13 +139,12 @@ public class SvoiCustomLogger {
         }
         if (!logsDatabaseProperties.isEnabled())
             return;
-        Date created = new Date();
         try {
-            created = format.parse(svoiJournal.getStart());
-        } catch (ParseException e) {
+            LocalDateTime created = LocalDateTime.parse(svoiJournal.getStart(), formatter);
+            logRepository.save(new Log(created, StringUtils.replace(svoiJournal.toString(), "OmniPlatform", "ORD"), deviceEventClassID));
+        } catch (Exception e) {
             log.error(e.getMessage(), e);
         }
-        logRepository.save(new Log(created, StringUtils.replace(svoiJournal.toString(), "OmniPlatform", "ORD"), deviceEventClassID));
     }
     private String getMacAddress() {
         List<String> addresses = new ArrayList<>();

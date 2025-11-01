@@ -13,7 +13,7 @@ spring:
     
 
   datasource:
-    url: ${DB_URL:jdbc:postgresql://localhost:5432/meta_base?currentSchema=postgres_metadata}
+    url: ${DB_URL:jdbc:postgresql://localhost:5432/meta_base}
     username: ${DB_USER:postgres}
     password: ${DB_PASSWORD:kampus}
     driverClassName: org.postgresql.Driver
@@ -43,7 +43,7 @@ spring:
     schemas: postgres_metadata
     enabled: true
     locations: classpath:db/migration
-    url: jdbc:postgresql://localhost:5432/log_db
+    url: jdbc:postgresql://localhost:5432/meta_base
     user: postgres
     password: kampus
 
@@ -72,7 +72,7 @@ ord:
 jwt:
   token: eyJraWQiOiJHYjM4OWEtOWY3Ni1nZGpzLWE5MmotMDI0MmJrOTQzNTYiLCJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJvcGVuLW1ldGFkYXRhLm9yZyIsInN1YiI6ImFkbWluIiwiZW1haWwiOiJhZG1pbkBvcGVubWV0YWRhdGEub3JnIiwiaXNCb3QiOmZhbHNlLCJ0b2tlblR5cGUiOiJQRVJTT05BTF9BQ0NFU1MiLCJpYXQiOjE3NjA0Mzk3MDQsImV4cCI6bnVsbH0.on5MXkOV22bRcrK0KUiT9LqQQIc463BjTOXiz64UJyCJxoWMhd9KMu6r9w_8knHS7Zmf6HVuJw_VqYA1yXL2wOXZyF8bDutFd0YlQbhLZKxsh2aJ6bI8kxiEWbmhixESoEVQJ4Qa3lzBPY6SFsJdnS7N1rD8Kr13pM2szTnGcX98-ggO0gQFja4LecsHMBNCyFFuIZVIoHlyPA_-JirdxPxMIhmHGHbPXRAPI0gzsWXRIDx0lOhBsPbtXw6vnL0DYSa0NzYRgCMT9ouHhWuP6gbUXF-IFgPvAu_47qnWBldC9g9v7VW-YgbG7FiD1OPlMFgVtWtL7mL-wZrkA_54mA
   task-create-partition: 0 0 0 * * ?
-  url: jdbc:postgresql://localhost:5432/log_db
+  url: jdbc:postgresql://localhost:5432/db_log
   username: postgres
   password: kampus
   driverClassName: org.postgresql.Driver
@@ -80,10 +80,11 @@ jwt:
 logs-database:
   enabled: true
   task-create-partition: 0 0 0 * * ?
-  url: jdbc:postgresql://localhost:5432/log_db
+  url: jdbc:postgresql://localhost:5432/db_log
   username: postgres
   password: kampus
   driverClassName: org.postgresql.Driver
+  table: "audit.jdata_orda_sync_log"
 
 clean-database-logs:
   # cron expression, to switch off put value '-'
@@ -106,6 +107,9 @@ management:
           enabled: true
 
 logging:
+  cef:
+    path: logs/cef
+    retention-days: 30
   level:
     root: INFO
     org.hibernate.SQL: DEBUG
