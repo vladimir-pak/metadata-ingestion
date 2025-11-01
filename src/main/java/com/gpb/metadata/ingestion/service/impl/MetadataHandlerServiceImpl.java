@@ -21,6 +21,7 @@ import com.gpb.metadata.ingestion.model.postgres.TableMetadata;
 import com.gpb.metadata.ingestion.properties.JwtTokenProvider;
 import com.gpb.metadata.ingestion.properties.WebClientProperties;
 import com.gpb.metadata.ingestion.service.MetadataHandlerService;
+import com.gpb.metadata.ingestion.service.VaultSecretService;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -39,9 +40,10 @@ public class MetadataHandlerServiceImpl implements MetadataHandlerService {
 
 
     private final WebClient webClient;
-    private final JwtTokenProvider tokenProvider;
+    private JwtTokenProvider tokenProvider;
     private final WebClientProperties webClientProperties;
     private final MetadataSchemasProperties schemasProperties;
+    private final VaultSecretService vault;
 
     @Value("${ord.api.max-connections:5}")
     private Integer maxConn;
@@ -58,7 +60,9 @@ public class MetadataHandlerServiceImpl implements MetadataHandlerService {
                 schemasProperties.getMssql(), ServiceType.MSSQL,
                 schemasProperties.getOracle(), ServiceType.ORACLE
         );
-
+        if (vault.isVaultConnected()) {
+            this.tokenProvider.setToken(vault.getJwtToken());
+        }
 
         ServiceType type = schemaTypeMap.get(schemaName);
         if (type == null) {

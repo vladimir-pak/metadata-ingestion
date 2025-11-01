@@ -106,7 +106,7 @@ public class SvoiJournal {
             throw new IllegalArgumentException(String.format("Обязательный парамерт %s пуст, поэтому нельзя вывести строковое представление записи.", emptyParam));
         } else {
             String var = this.deviceProduct;
-            return "CEF:0|OmniPlatform|" + var + "|" + this.deviceVersion + "|" + this.deviceEventClassID + "|" + this.name + "|" + this.severity.getValue() + "|" + getExtension();
+            return "CEF:0|ORD|" + var + "|" + this.deviceVersion + "|" + this.deviceEventClassID + "|" + this.name + "|" + this.severity.getValue() + "|" + getExtension();
         }
     }
 
