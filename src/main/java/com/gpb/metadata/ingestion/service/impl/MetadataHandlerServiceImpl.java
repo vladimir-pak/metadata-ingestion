@@ -39,7 +39,7 @@ public class MetadataHandlerServiceImpl implements MetadataHandlerService {
 
 
     private final WebClient webClient;
-    private JwtTokenProvider tokenProvider;
+    private final JwtTokenProvider tokenProvider;
     private final WebClientProperties webClientProperties;
     private final MetadataSchemasProperties schemasProperties;
 
