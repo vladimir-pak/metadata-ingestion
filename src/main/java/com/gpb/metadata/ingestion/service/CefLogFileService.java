@@ -26,8 +26,12 @@ public class CefLogFileService {
     private static final ZoneId ZONE = ZoneId.systemDefault();
 
     public Path getDailyLogPath() {
-        String date = LocalDate.now(ZONE).format(FILE_DATE);
-        return Paths.get(properties.getPath() + ".jdata.log." + date);
+        return Paths.get(properties.getPath() + ".log");
+    }
+
+    public Path getArchLogPath() {
+        String date = LocalDate.now(ZONE).minusDays(1).format(FILE_DATE);
+        return Paths.get(properties.getPath() + ".log." + date);
     }
 
     public void writeToFile(LocalDateTime created, String cefLog) {
@@ -65,4 +69,16 @@ public class CefLogFileService {
             log.error("Ошибка при очистке старых логов", e);
         }
     }
+
+    public void rotateLogFile() {
+        Path currentFileName = getDailyLogPath();
+        Path archFileName = getArchLogPath();
+        if (currentFileName == null || !Files.exists(currentFileName)) return;
+        try {
+            Files.move(currentFileName, archFileName);
+        } catch (IOException e) {
+            log.error("Ошибка при архивировании лог-файла: ", e);
+        }
+    }
+    
 }

@@ -62,6 +62,5 @@ public class LogRepository {
                 logEntity.getType());
 
         cefLogFileService.writeToFile(logEntity.getCreated(), logEntity.getLog());
-        cefLogFileService.cleanupOldLogs();
     }
 }
