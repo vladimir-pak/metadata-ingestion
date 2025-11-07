@@ -1,7 +1,6 @@
 package com.gpb.metadata.ingestion.repository;
 
 import com.gpb.metadata.ingestion.model.EntityId;
-import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Repository;

@@ -18,10 +18,10 @@ import com.gpb.metadata.ingestion.enums.DbObjectType;
 import com.gpb.metadata.ingestion.model.postgres.DatabaseMetadata;
 import com.gpb.metadata.ingestion.model.postgres.SchemaMetadata;
 import com.gpb.metadata.ingestion.model.postgres.TableMetadata;
-import com.gpb.metadata.ingestion.properties.JwtTokenProvider;
+// import com.gpb.metadata.ingestion.properties.JwtTokenProvider;
 import com.gpb.metadata.ingestion.properties.WebClientProperties;
+import com.gpb.metadata.ingestion.service.KeycloakAuthService;
 import com.gpb.metadata.ingestion.service.MetadataHandlerService;
-import com.gpb.metadata.ingestion.service.VaultSecretService;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -40,10 +40,12 @@ public class MetadataHandlerServiceImpl implements MetadataHandlerService {
 
 
     private final WebClient webClient;
-    private JwtTokenProvider tokenProvider;
+    // private final JwtTokenProvider tokenProvider;
     private final WebClientProperties webClientProperties;
     private final MetadataSchemasProperties schemasProperties;
-    private final VaultSecretService vault;
+
+    private final KeycloakAuthService keycloakAuthService;
+    private String token;
 
     @Value("${ord.api.max-connections:5}")
     private Integer maxConn;
@@ -60,9 +62,6 @@ public class MetadataHandlerServiceImpl implements MetadataHandlerService {
                 schemasProperties.getMssql(), ServiceType.MSSQL,
                 schemasProperties.getOracle(), ServiceType.ORACLE
         );
-        if (vault.isVaultConnected()) {
-            this.tokenProvider.setToken(vault.getJwtToken());
-        }
 
         ServiceType type = schemaTypeMap.get(schemaName);
         if (type == null) {
@@ -74,6 +73,8 @@ public class MetadataHandlerServiceImpl implements MetadataHandlerService {
             schemaCacheService.synchronizeWithDatabase(schemaName, serviceName);
         CacheComparisonResult<TableMetadata> cacheTable = 
             tableCacheService.synchronizeWithDatabase(schemaName, serviceName);
+
+        token = keycloakAuthService.getValidAccessToken();
         
         /*
          * Добавляем сущности в порядке очередности:
@@ -214,7 +215,8 @@ public class MetadataHandlerServiceImpl implements MetadataHandlerService {
                 .uri(uriBuilder -> uriBuilder
                         .path(endpoint)
                         .build())
-                .header(HttpHeaders.AUTHORIZATION, "Bearer " + tokenProvider.getToken())
+                // .header(HttpHeaders.AUTHORIZATION, "Bearer " + tokenProvider.getToken())
+                .header(HttpHeaders.AUTHORIZATION, "Bearer " + token)
                 .bodyValue(requestBody)
                 .exchangeToMono(response -> {
                     if (response.statusCode().isError()) {
@@ -236,7 +238,8 @@ public class MetadataHandlerServiceImpl implements MetadataHandlerService {
                         .path(endpoint)
                         .queryParam("recursive", "true")
                         .build())
-                .header(HttpHeaders.AUTHORIZATION, "Bearer " + tokenProvider.getToken())
+                // .header(HttpHeaders.AUTHORIZATION, "Bearer " + tokenProvider.getToken())
+                .header(HttpHeaders.AUTHORIZATION, "Bearer " + token)
                 .retrieve()
                 .onStatus(status -> status.is4xxClientError(), response -> 
                     Mono.error(new HttpClientErrorException(response.statusCode())))

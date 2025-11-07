@@ -52,27 +52,6 @@ spring:
     threads:
       max: 50 # Размер очереди запросов
 
-  # vault config
-  config:
-    import: optional:vault://
-
-  cloud:
-    vault:
-      uri: http://vault:8200
-      authentication: APPROLE
-      app-role:
-        role-id: ${VAULT_ROLE_ID}
-        secret-id: ${VAULT_SECRET_ID}
-
-      kv:
-        enabled: true
-        backend: secret_v2_t
-        default-context: ord/src/connections
-        application-name: ""
-
-      connection-timeout: 5000
-      read-timeout: 15000
-
 ignite:
   persistence:
     storagePath: ./ignite/storage
