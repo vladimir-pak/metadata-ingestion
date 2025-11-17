@@ -14,8 +14,6 @@ import org.springframework.util.StringUtils;
 
 import java.net.InetAddress;
 import java.net.NetworkInterface;
-import java.net.SocketException;
-import java.net.UnknownHostException;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.*;
@@ -27,7 +25,7 @@ public class SvoiCustomLogger {
     private final LogsDatabaseProperties logsDatabaseProperties;
     private final LogRepository logRepository;
     private final SvoiJournalFactory svoiJournalFactory = new SvoiJournalFactory();
-    private static final DateTimeFormatter formatter = DateTimeFormatter.ofPattern("dd.MM.yyyy HH:mm:ss");
+    private static final DateTimeFormatter FORMATTER = DateTimeFormatter.ofPattern("dd.MM.yyyy HH:mm:ss");
 
     @Autowired
     public SvoiCustomLogger(SysProperties sysProperties,
@@ -56,113 +54,127 @@ public class SvoiCustomLogger {
         }
     }
 
-    public void send(String deviceEventClassID, String name, String message, SvoiSeverityEnum severity, SvoiJournal journal) {
-        String localHostName;
-        String localHostAddress;
+    public void logBadCredentials(String ip, String username, String endpoint) {
         try {
-            localHostName = InetAddress.getLocalHost().getHostName();
-            localHostAddress = InetAddress.getLocalHost().getHostAddress();
-        } catch (UnknownHostException e) {
-            localHostName = InetAddress.getLoopbackAddress().getHostName();
-            localHostAddress = InetAddress.getLoopbackAddress().getHostAddress();
+            SvoiJournal journal = prepareJournalBase();
+            journal.setSrc(ip);
+            journal.setShost(ip);
+
+            String message = String.format(
+                    "authFailed invalidCredentials user=%s endpoint=%s ip=%s",
+                    username != null ? username : "unknown",
+                    endpoint,
+                    ip
+            );
+
+            send("authFailed", "Invalid Login or Password", message,
+                    SvoiSeverityEnum.FIVE, journal);
+
+        } catch (Exception ex) {
+            log.error("Ошибка при логировании неверных учётных данных", ex);
         }
+    }
+
+    public void sendInternal(String deviceEventClassID,
+                             String name,
+                             String message,
+                             SvoiSeverityEnum severity) {
+
+        SvoiJournal journal = prepareJournalBase();
+        send(deviceEventClassID, name, message, severity, journal);
+    }
+
+    private void send(String deviceEventClassID,
+                      String name,
+                      String message,
+                      SvoiSeverityEnum severity,
+                      SvoiJournal journal) {
+
+        fillJournalDefaults(journal, deviceEventClassID, name, message, severity);
+
+        try (MDC.MDCCloseable a = MDC.putCloseable("host", journal.getHostForSvoi());
+             MDC.MDCCloseable b = MDC.putCloseable("log_type", "audit_log")) {
+
+            log.info(journalToString(journal));
+
+        }
+        if (!logsDatabaseProperties.isEnabled()) return;
+
+        try {
+            LocalDateTime created = LocalDateTime.parse(journal.getStart(), FORMATTER);
+
+            logRepository.save(new Log(
+                    created,
+                    journalToString(journal),
+                    deviceEventClassID
+            ));
+        } catch (Exception e) {
+            log.error("Ошибка при сохранении лога в БД", e);
+        }
+    }
+
+    private SvoiJournal prepareJournalBase() {
+        SvoiJournal journal = svoiJournalFactory.getJournalSource();
+
+        HostInfo host = getLocalHostInfo();
+
+        journal.setSrc(host.ip());
+        journal.setShost(host.name());
+        journal.setDhost(host.name());
+        journal.setDst(host.ip());
+        journal.setDvchost(host.name());
+        journal.setDpt(sysProperties.getDpt());
+
+        return journal;
+    }
+
+    private void fillJournalDefaults(SvoiJournal journal,
+                                     String deviceEventClassID,
+                                     String name,
+                                     String message,
+                                     SvoiSeverityEnum severity) {
 
         journal.setDeviceProduct(sysProperties.getName());
         journal.setDeviceVersion(sysProperties.getVersion());
-        journal.setDpt(sysProperties.getDpt());
         journal.setDntdom(sysProperties.getDntdom());
         journal.setDeviceEventClassID(deviceEventClassID);
         journal.setName(name);
         journal.setMessage(message);
-        journal.setDhost(localHostName);
-        journal.setDvchost(localHostName);
-        journal.setDst(localHostAddress);
         journal.setDuser(sysProperties.getUser());
         journal.setSuser(sysProperties.getUser());
         journal.setApp("");
         journal.setDmac(getMacAddress());
         journal.setSeverity(severity);
-
-        try (
-                MDC.MDCCloseable hostClosable = MDC.putCloseable("host", journal.getHostForSvoi());
-                MDC.MDCCloseable logTypeClosable = MDC.putCloseable("log_type", "audit_log");
-        ) {
-            log.info(StringUtils.replace(journal.toString(), "OmniPlatform", "ORD"));
-        }
-
-        if (!logsDatabaseProperties.isEnabled())
-            return;
-
-        try {
-            LocalDateTime created = LocalDateTime.parse(journal.getStart(), formatter);
-            logRepository.save(new Log(created,
-                    StringUtils.replace(journal.toString(), "OmniPlatform", "ORD"),
-                    deviceEventClassID));
-        } catch (Exception e) {
-            log.error(e.getMessage(), e);
-        }
-
-
     }
 
-    public void send(String deviceEventClassID, String name, String message, SvoiSeverityEnum severity) {
-        String localHostName = "";
-        String localHostAddress = "";
+    private record HostInfo(String name, String ip) {
+    }
+
+    private HostInfo getLocalHostInfo() {
         try {
-            localHostName = InetAddress.getLocalHost().getHostName();
-            localHostAddress = InetAddress.getLocalHost().getHostAddress();
-        } catch (UnknownHostException e) {
-            localHostName = InetAddress.getLoopbackAddress().getHostName();
-            localHostAddress = InetAddress.getLoopbackAddress().getHostAddress();
-        }
-        SvoiJournal svoiJournal = svoiJournalFactory.getJournalSource();
-        svoiJournal.setDeviceProduct(sysProperties.getName());
-        svoiJournal.setDeviceVersion(sysProperties.getVersion());
-        svoiJournal.setDpt(sysProperties.getDpt());
-        svoiJournal.setDntdom(sysProperties.getDntdom());
-        svoiJournal.setDeviceEventClassID(deviceEventClassID);
-        svoiJournal.setName(name);
-        svoiJournal.setMessage(message);
-        svoiJournal.setDhost(localHostName);
-        svoiJournal.setDvchost(localHostName);
-        svoiJournal.setDst(localHostAddress);
-        svoiJournal.setDuser(sysProperties.getUser());
-        svoiJournal.setSuser(sysProperties.getUser());
-        svoiJournal.setApp("");
-        svoiJournal.setDmac(getMacAddress());
-        svoiJournal.setSeverity(severity);
-        try (
-                MDC.MDCCloseable hostClosable = MDC.putCloseable("host", svoiJournal.getHostForSvoi());
-                MDC.MDCCloseable logTypeClosable = MDC.putCloseable("log_type", "audit_log");
-        ) {
-            log.info(StringUtils.replace(svoiJournal.toString(), "OmniPlatform", "ORD"));
-        }
-        if (!logsDatabaseProperties.isEnabled())
-            return;
-        try {
-            LocalDateTime created = LocalDateTime.parse(svoiJournal.getStart(), formatter);
-            logRepository.save(new Log(created, StringUtils.replace(svoiJournal.toString(), "OmniPlatform", "ORD"), deviceEventClassID));
+            InetAddress inet = InetAddress.getLocalHost();
+            return new HostInfo(inet.getHostName(), inet.getHostAddress());
         } catch (Exception e) {
-            log.error(e.getMessage(), e);
+            InetAddress inet = InetAddress.getLoopbackAddress();
+            return new HostInfo(inet.getHostName(), inet.getHostAddress());
         }
     }
+
+    private String journalToString(SvoiJournal journal) {
+        return StringUtils.replace(journal.toString(), "OmniPlatform", "ORD");
+    }
+
     private String getMacAddress() {
-        List<String> addresses = new ArrayList<>();
+        List<String> macs = new ArrayList<>();
         try {
-            Enumeration<NetworkInterface> networkInterfaceEnumeration = NetworkInterface.getNetworkInterfaces();
-            NetworkInterface networkInterface;
-            while (networkInterfaceEnumeration.hasMoreElements()) {
-                networkInterface = networkInterfaceEnumeration.nextElement();
-                byte[] mac = networkInterface.getHardwareAddress();
-                if (mac == null)
-                    return String.join(":", addresses);
-                for (byte b : mac) {
-                    addresses.add(String.format("%02X", b));
-                }
+            Enumeration<NetworkInterface> interfaces = NetworkInterface.getNetworkInterfaces();
+            while (interfaces.hasMoreElements()) {
+                byte[] mac = interfaces.nextElement().getHardwareAddress();
+                if (mac == null) continue;
+                for (byte b : mac) macs.add(String.format("%02X", b));
             }
-        } catch (SocketException e) {
-            log.error(e.getMessage(), e);
+        } catch (Exception ignored) {
         }
-        return String.join(":", addresses);
+        return String.join(":", macs);
     }
 }
