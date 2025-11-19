@@ -47,7 +47,7 @@ public class SvoiCustomLogger {
             journal.setSrc(clientIp);
             journal.setSpt(clientPort);
 
-            send("metadataSyncCall", "API Request", message, SvoiSeverityEnum.ONE, journal);
+            send("apiCall", "API Request", message, SvoiSeverityEnum.ONE, journal);
 
         } catch (Exception e) {
             log.error("Ошибка при логировании вызова API", e);
@@ -184,11 +184,23 @@ public class SvoiCustomLogger {
         journal.setDeviceEventClassID(deviceEventClassID);
         journal.setName(name);
         journal.setMessage(message);
-        journal.setDuser(sysProperties.getUser());
-        journal.setSuser(sysProperties.getUser());
-        journal.setApp("");
+        if (journal.getDuser() == null) {
+            journal.setDuser(sysProperties.getUser());
+        }
+        if (journal.getSuser() == null) {
+            journal.setSuser(sysProperties.getUser());
+        }
+        if (journal.getApp() == null) {
+            journal.setApp("TCP");
+        }
         journal.setDmac(getMacAddress());
         journal.setSeverity(severity);
+        if (journal.getSpt() == null) {
+            journal.setSpt(sysProperties.getDpt());
+        }
+        if (journal.getDpt() == null) {
+            journal.setDpt(sysProperties.getDpt());
+        }
     }
 
     private record HostInfo(String name, String ip) {

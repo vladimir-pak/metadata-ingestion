@@ -46,6 +46,8 @@ public class CustomAuthenticationEntryPoint implements AuthenticationEntryPoint 
             log.error("Ошибка аутентификации: {}. User: {}, Endpoint: {}, IP: {}",
                     authException.getMessage(), username, endpoint, clientIp);
 
+            svoiLogger.logBadCredentials(clientIp, username, endpoint);
+
             writeJson(response, HttpServletResponse.SC_UNAUTHORIZED,
                     "Authentication failed");
         }
