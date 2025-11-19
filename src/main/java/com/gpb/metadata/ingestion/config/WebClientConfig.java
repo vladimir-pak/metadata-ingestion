@@ -7,7 +7,6 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.web.reactive.function.client.WebClient;
 
-import com.gpb.metadata.ingestion.properties.JwtTokenProvider;
 import com.gpb.metadata.ingestion.properties.WebClientProperties;
 
 @Configuration
@@ -21,7 +20,7 @@ public class WebClientConfig {
     }
 
     @Bean
-    public WebClient webClient(WebClient.Builder webClientBuilder, JwtTokenProvider tokenProvider) {
+    public WebClient webClient(WebClient.Builder webClientBuilder) {
         return webClientBuilder
                 .baseUrl(webClientProperties.getBaseUrl())
                 .defaultHeader(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE)
