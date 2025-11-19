@@ -8,11 +8,6 @@
 		<version>3.5.6</version>
 		<relativePath/> <!-- lookup parent from repository -->
 	</parent>
-	<groupId>com.gpb</groupId>
-	<artifactId>metadata-ingestion</artifactId>
-	<version>${app.version}</version>
-	<name>metadata-ingestion</name>
-	<description>Metadata ingestion application</description>
 	<properties>
 		<app.version>0.0.1</app.version>
 		<java.version>17</java.version>
@@ -20,6 +15,12 @@
 		<ignite-autoconfigure.version>1.0.0</ignite-autoconfigure.version>
 		<ignite-spring-data.version>2.0.0</ignite-spring-data.version>
 	</properties>
+	<groupId>com.gpb</groupId>
+	<artifactId>metadata-ingestion</artifactId>
+	<version>${app.version}</version>
+	<name>metadata-ingestion</name>
+	<description>Metadata ingestion application</description>
+
 	<dependencies>
 		<dependency>
             <groupId>org.springframework.boot</groupId>

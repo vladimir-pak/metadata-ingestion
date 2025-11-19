@@ -54,6 +54,50 @@ public class SvoiCustomLogger {
         }
     }
 
+    public void logOrdaRequest(String endpoint,
+                               String method,
+                               int status,
+                               long durationMs,
+                               String error,
+                               String ordaDns,
+                               String ordaIp,
+                               int ordaPort,
+                               String ordaUser) {
+
+        try {
+            SvoiJournal journal = prepareJournalBase();
+
+            journal.setDhost(ordaDns);
+            journal.setDst(ordaIp);
+            journal.setDpt(ordaPort);
+            journal.setDuser(ordaUser);
+
+            String msg;
+            if (error == null) {
+                msg = String.format(
+                        "ordaApiCall method=%s endpoint=%s status=%d duration=%dms",
+                        method, endpoint, status, durationMs
+                );
+            } else {
+                msg = String.format(
+                        "ordaApiCall method=%s endpoint=%s status=%d duration=%dms error=%s",
+                        method, endpoint, status, durationMs, error
+                );
+            }
+
+            send(
+                    "ordaApiCall",
+                    "ORD API Request",
+                    msg,
+                    error == null ? SvoiSeverityEnum.ONE : SvoiSeverityEnum.FIVE,
+                    journal
+            );
+
+        } catch (Exception ex) {
+            log.error("Ошибка при логировании запроса в ОРД", ex);
+        }
+    }
+
     public void logBadCredentials(String ip, String username, String endpoint) {
         try {
             SvoiJournal journal = prepareJournalBase();

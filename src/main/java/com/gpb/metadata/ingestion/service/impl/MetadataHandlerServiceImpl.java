@@ -1,15 +1,17 @@
 package com.gpb.metadata.ingestion.service.impl;
 
+import java.net.InetAddress;
+import java.net.URI;
 import java.util.*;
 
+import com.gpb.metadata.ingestion.config.KeycloakConfig;
 import com.gpb.metadata.ingestion.enums.ServiceType;
+import com.gpb.metadata.ingestion.log.SvoiCustomLogger;
 import com.gpb.metadata.ingestion.properties.MetadataSchemasProperties;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpHeaders;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
-import org.springframework.web.client.HttpClientErrorException;
-import org.springframework.web.client.HttpServerErrorException;
 import org.springframework.web.reactive.function.client.WebClient;
 
 import com.gpb.metadata.ingestion.cache.CacheComparisonResult;
@@ -18,7 +20,6 @@ import com.gpb.metadata.ingestion.enums.DbObjectType;
 import com.gpb.metadata.ingestion.model.postgres.DatabaseMetadata;
 import com.gpb.metadata.ingestion.model.postgres.SchemaMetadata;
 import com.gpb.metadata.ingestion.model.postgres.TableMetadata;
-// import com.gpb.metadata.ingestion.properties.JwtTokenProvider;
 import com.gpb.metadata.ingestion.properties.WebClientProperties;
 import com.gpb.metadata.ingestion.service.KeycloakAuthService;
 import com.gpb.metadata.ingestion.service.MetadataHandlerService;
@@ -37,12 +38,12 @@ public class MetadataHandlerServiceImpl implements MetadataHandlerService {
     private final SchemaMetadataCacheServiceImpl schemaCacheService;
     private final TableMetadataCacheServiceImpl tableCacheService;
     private final MapperDto mapperDto;
-
+    private final SvoiCustomLogger svoiCustomLogger;
 
     private final WebClient webClient;
-    // private final JwtTokenProvider tokenProvider;
     private final WebClientProperties webClientProperties;
     private final MetadataSchemasProperties schemasProperties;
+    private final KeycloakConfig keycloakConfig;
 
     private final KeycloakAuthService keycloakAuthService;
     private String token;
@@ -209,42 +210,115 @@ public class MetadataHandlerServiceImpl implements MetadataHandlerService {
                 .block(); // Ждем завершения всех
     }
 
-    // PUT запрос с динамическим получением токена
     private <T> Mono<T> putRequest(String endpoint, Object requestBody, Class<T> responseType) {
+        OrdaHost orda = parseOrdaHost();
+        long start = System.currentTimeMillis();
+        String username = keycloakConfig.getUsername();
+
         return webClient.put()
-                .uri(uriBuilder -> uriBuilder
-                        .path(endpoint)
-                        .build())
-                // .header(HttpHeaders.AUTHORIZATION, "Bearer " + tokenProvider.getToken())
+                .uri(endpoint)
                 .header(HttpHeaders.AUTHORIZATION, "Bearer " + token)
                 .bodyValue(requestBody)
                 .exchangeToMono(response -> {
+
+                    long duration = System.currentTimeMillis() - start;
+
                     if (response.statusCode().isError()) {
+
                         return response.bodyToMono(String.class)
-                                .flatMap(errorBody -> 
-                                    Mono.error(new RuntimeException("HTTP " + response.statusCode() + " - " + errorBody))
-                                );
-                    } else {
-                        return response.bodyToMono(responseType);
+                                .flatMap(err -> {
+                                    svoiCustomLogger.logOrdaRequest(
+                                            endpoint,
+                                            "PUT",
+                                            response.statusCode().value(),
+                                            duration,
+                                            err,
+                                            orda.dns(),
+                                            orda.ip(),
+                                            orda.port(),
+                                            username
+                                    );
+                                    return Mono.error(new RuntimeException(err));
+                                });
                     }
+
+                    svoiCustomLogger.logOrdaRequest(
+                            endpoint,
+                            "PUT",
+                            response.statusCode().value(),
+                            duration,
+                            null,
+                            orda.dns(),
+                            orda.ip(),
+                            orda.port(),
+                            username
+                    );
+
+                    return response.bodyToMono(responseType);
                 });
     }
-    
-    // DELETE запрос с динамическим получением токена
+
     private Mono<Void> deleteRequest(String endpoint) {
-        log.info("Endpoint for deletion: {}", endpoint);
+
+        OrdaHost orda = parseOrdaHost();
+        long start = System.currentTimeMillis();
+        String username = keycloakConfig.getUsername();
+
         return webClient.delete()
                 .uri(uriBuilder -> uriBuilder
                         .path(endpoint)
                         .queryParam("recursive", "true")
                         .build())
-                // .header(HttpHeaders.AUTHORIZATION, "Bearer " + tokenProvider.getToken())
                 .header(HttpHeaders.AUTHORIZATION, "Bearer " + token)
-                .retrieve()
-                .onStatus(status -> status.is4xxClientError(), response -> 
-                    Mono.error(new HttpClientErrorException(response.statusCode())))
-                .onStatus(status -> status.is5xxServerError(), response -> 
-                    Mono.error(new HttpServerErrorException(response.statusCode())))
-                .bodyToMono(Void.class);
+                .exchangeToMono(response -> {
+
+                    long duration = System.currentTimeMillis() - start;
+
+                    if (response.statusCode().isError()) {
+                        return response.bodyToMono(String.class)
+                                .flatMap(err -> {
+                                    svoiCustomLogger.logOrdaRequest(
+                                            endpoint,
+                                            "DELETE",
+                                            response.statusCode().value(),
+                                            duration,
+                                            err,
+                                            orda.dns(),
+                                            orda.ip(),
+                                            orda.port(),
+                                            username
+                                    );
+                                    return Mono.error(new RuntimeException(err));
+                                });
+                    }
+
+                    svoiCustomLogger.logOrdaRequest(
+                            endpoint,
+                            "DELETE",
+                            response.statusCode().value(),
+                            duration,
+                            null,
+                            orda.dns(),
+                            orda.ip(),
+                            orda.port(),
+                            username
+                    );
+
+                    return Mono.empty();
+                });
+    }
+
+    private record OrdaHost(String dns, String ip, int port) {}
+
+    private OrdaHost parseOrdaHost() {
+        try {
+            URI uri = new URI(webClientProperties.getBaseUrl());
+            String dns = uri.getHost();
+            int port = uri.getPort() == -1 ? 443 : uri.getPort();
+            String ip = InetAddress.getByName(dns).getHostAddress();
+            return new OrdaHost(dns, ip, port);
+        } catch (Exception e) {
+            return new OrdaHost("unknown", "unknown", 443);
+        }
     }
 }
