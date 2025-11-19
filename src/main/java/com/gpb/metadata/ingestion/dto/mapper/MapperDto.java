@@ -1,31 +1,39 @@
 package com.gpb.metadata.ingestion.dto.mapper;
 
 import java.util.List;
+import java.util.Optional;
 import java.util.stream.Collectors;
 
+import com.gpb.metadata.ingestion.enums.*;
+import com.gpb.metadata.ingestion.model.schema.TableConstraints;
+import com.gpb.metadata.ingestion.service.impl.ColumnTypeMapperService;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.annotation.Configuration;
 
 import com.gpb.metadata.ingestion.dto.ColumnMetadataDto;
 import com.gpb.metadata.ingestion.dto.DatabaseMetadataDto;
 import com.gpb.metadata.ingestion.dto.SchemaMetadataDto;
 import com.gpb.metadata.ingestion.dto.TableMetadataDto;
-import com.gpb.metadata.ingestion.enums.Entity;
-import com.gpb.metadata.ingestion.enums.PostgresColumnType;
-import com.gpb.metadata.ingestion.enums.TableTypes;
-import com.gpb.metadata.ingestion.enums.TypesWithDataLength;
 import com.gpb.metadata.ingestion.model.Metadata;
 import com.gpb.metadata.ingestion.model.postgres.DatabaseMetadata;
 import com.gpb.metadata.ingestion.model.postgres.SchemaMetadata;
 import com.gpb.metadata.ingestion.model.postgres.TableMetadata;
 import com.gpb.metadata.ingestion.model.schema.TableData;
 
+
+@Slf4j
 @Configuration
+@RequiredArgsConstructor
 public class MapperDto {
-    public Object getDto(Entity entity, Metadata metadata) {
-        return switch (entity) {
+
+    private final ColumnTypeMapperService columnTypeMapperService;
+
+    public Object getDto(DbObjectType dbObjectType, Metadata metadata, ServiceType serviceType) {
+        return switch (dbObjectType) {
             case DATABASE -> mapToDatabaseDto((DatabaseMetadata) metadata);
             case SCHEMA -> mapToSchemaDto((SchemaMetadata) metadata);
-            case TABLE -> mapToTableDto((TableMetadata) metadata);
+            case TABLE -> mapToTableDto((TableMetadata) metadata, serviceType);
         };
     }
 
@@ -44,36 +52,51 @@ public class MapperDto {
                 .database(meta.getParentFqn())
                 .build();
     }
-    
-    public TableMetadataDto mapToTableDto(TableMetadata meta) {
+
+    public TableMetadataDto mapToTableDto(TableMetadata meta, ServiceType serviceType) {
         TableData tableData = meta.getTableData();
-        // Преобразуем tableType
         String processedTableType = TableTypes.map(tableData.getTableType());
 
-        // Собираем атрибуты таблицы
         List<ColumnMetadataDto> columns = tableData.getColumns().stream()
                 .map(column -> {
-                    // Преобразуем dataType через enum
-                    String processedDataType = PostgresColumnType.map(column.getDataType());
-                    // Предобработка dataLength с проверкой на обязательность заполнения с учетом dataType
+                    String processedDataType = columnTypeMapperService.map(serviceType, column.getDataType());
+
                     String processedDataLength = TypesWithDataLength.getProcessedDataLength(
                             processedDataType,
                             column.getDataLength()
-                        );
-                    
+                    );
+
+                    String constraint = column.getConstraint();
+                    if ("NULLABLE".equalsIgnoreCase(constraint)) {
+                        constraint = null;
+                    }
+
                     return ColumnMetadataDto.builder()
-                        .name(column.getName())
-                        .dataType(processedDataType)  // Обработанное значение
-                        .dataTypeDisplay(column.getDataTypeDisplay())
-                        .dataLength(processedDataLength)
-                        .description(column.getDescription())
-                        .constraint(column.getConstraint())
-                        .ordinalPosition(column.getOrdinalPosition())
-                        .build();
+                            .name(column.getName())
+                            .dataType(processedDataType)
+                            .arrayDataType(resolveArrayType(column.getDataType(), processedDataType))
+                            .dataTypeDisplay(column.getDataTypeDisplay())
+                            .dataLength(processedDataLength)
+                            .description(column.getDescription())
+                            .constraint(constraint)
+                            .ordinalPosition(column.getOrdinalPosition())
+                            .build();
                 })
                 .collect(Collectors.toList());
 
-        // Собираем ограничения (constraints) таблицы
+        //Фильтрация поддерживаемых констрейнтов перед отправкой в Орду
+        List<TableConstraints> filteredConstraints = Optional.ofNullable(tableData.getTableConstraints())
+                .orElseGet(List::of)
+                .stream()
+                .filter(c -> {
+                    boolean keep = ConstraintType.isSupported(c.getConstraintType());
+                    if (!keep) {
+                        log.debug("Constraint '{}' пропущен — не поддерживается Ордой",
+                                c.getConstraintType());
+                    }
+                    return keep;
+                })
+                .collect(Collectors.toList());
 
         return TableMetadataDto.builder()
                 .name(meta.getName())
@@ -84,7 +107,19 @@ public class MapperDto {
                 .databaseSchema(meta.getParentFqn())
                 .description(meta.getDescription())
                 .columns(columns)
-                .tableConstraints(tableData.getTableConstraints())
+                .tableConstraints(filteredConstraints)
                 .build();
+    }
+
+    private String resolveArrayType(String sourceType, String processedType) {
+        if (sourceType == null || !"ARRAY".equalsIgnoreCase(processedType)) {
+            return null; // только для ARRAY
+        }
+
+        if (sourceType.endsWith("[]")) {
+            return sourceType.substring(0, sourceType.length() - 2).toUpperCase();
+        }
+
+        return null;
     }
 }

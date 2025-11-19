@@ -5,5 +5,4 @@ import lombok.Data;
 @Data
 public class RequestBodyDto {
     private String serviceName;
-    private String dbType;
 }

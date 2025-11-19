@@ -5,43 +5,41 @@
 	<parent>
 		<groupId>org.springframework.boot</groupId>
 		<artifactId>spring-boot-starter-parent</artifactId>
-		<version>3.5.5</version>
+		<version>3.5.6</version>
 		<relativePath/> <!-- lookup parent from repository -->
 	</parent>
-	<groupId>com.gpb</groupId>
-	<artifactId>metadata-ingestion</artifactId>
-	<version>0.0.2-SNAPSHOT</version>
-	<name>metadata-ingestion</name>
-	<description>Demo project for Spring Boot</description>
-	<url/>
-	<licenses>
-		<license/>
-	</licenses>
-	<developers>
-		<developer/>
-	</developers>
-	<scm>
-		<connection/>
-		<developerConnection/>
-		<tag/>
-		<url/>
-	</scm>
 	<properties>
+		<app.version>0.0.1</app.version>
 		<java.version>17</java.version>
 		<ignite.version>2.17.0</ignite.version>
 		<ignite-autoconfigure.version>1.0.0</ignite-autoconfigure.version>
 		<ignite-spring-data.version>2.0.0</ignite-spring-data.version>
 	</properties>
+	<groupId>com.gpb</groupId>
+	<artifactId>metadata-ingestion</artifactId>
+	<version>${app.version}</version>
+	<name>metadata-ingestion</name>
+	<description>Metadata ingestion application</description>
+
 	<dependencies>
 		<dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter</artifactId>
         </dependency>
-
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-starter-security</artifactId>
+		</dependency>
 		<dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-web</artifactId>
         </dependency>
+		<!-- Flyway -->
+		<dependency>
+			<groupId>org.flywaydb</groupId>
+			<artifactId>flyway-core</artifactId>
+			<version>9.16.0</version> <!-- или выше -->
+		</dependency>
 
 		<dependency>
 			<groupId>org.springframework.boot</groupId>
@@ -52,12 +50,6 @@
 			<groupId>org.springframework.boot</groupId>
 			<artifactId>spring-boot-starter-data-jpa</artifactId>
 		</dependency>
-
-		<!-- <dependency>
-			<groupId>org.springframework.boot</groupId>
-			<artifactId>spring-boot-starter-test</artifactId>
-			<scope>test</scope>
-		</dependency> -->
 
 		<dependency>
             <groupId>org.projectlombok</groupId>
@@ -83,49 +75,17 @@
 			<artifactId>ignite-spring</artifactId>
 			<version>${ignite.version}</version>
 		</dependency>
-
-		<!-- <dependency>
-			<groupId>org.apache.ignite</groupId>
-			<artifactId>ignite-core</artifactId>
-			<version>${ignite.version}</version>
-		</dependency>
-
 		<dependency>
 			<groupId>org.apache.ignite</groupId>
 			<artifactId>ignite-indexing</artifactId>
 			<version>${ignite.version}</version>
 		</dependency>
+		<dependency>
+			<groupId>com.h2database</groupId>
+			<artifactId>h2</artifactId>
+			<version>1.4.197</version>
+		</dependency>
 
-		<dependency>
-			<groupId>org.apache.ignite</groupId>
-			<artifactId>ignite-compress</artifactId>
-			<version>${ignite.version}</version>
-		</dependency>
-		<dependency>
-			<groupId>org.apache.ignite</groupId>
-			<artifactId>ignite-spring-data-ext</artifactId>
-			<version>${ignite-spring-data.version}</version>
-		</dependency>
-		<dependency>
-			<groupId>org.apache.ignite</groupId>
-			<artifactId>ignite-spring</artifactId>
-			<version>${ignite.version}</version>
-		</dependency>
-		<dependency>
-			<groupId>org.apache.ignite</groupId>
-			<artifactId>ignite-calcite</artifactId>
-			<version>${ignite.version}</version>
-		</dependency>
-		<dependency>
-			<groupId>org.apache.ignite</groupId>
-			<artifactId>ignite-spring-boot-autoconfigure-ext</artifactId>
-			<version>1.0.0</version>
-		</dependency>
-		<dependency>
-			<groupId>org.apache.ignite</groupId>
-			<artifactId>ignite-rest-http</artifactId>
-			<version>${ignite.version}</version>
-		</dependency> -->
 
 		<!-- JSON Processing (для работы с JsonNode) -->
 		<dependency>
@@ -149,6 +109,38 @@
             <groupId>org.springdoc</groupId>
             <artifactId>springdoc-openapi-starter-webmvc-ui</artifactId>
             <version>2.3.0</version>
+        </dependency>
+
+		<!-- Указание точных версий без уязвимостей -->
+        <dependency>
+            <groupId>io.netty</groupId>
+            <artifactId>netty-all</artifactId>
+            <version>${netty.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>io.netty</groupId>
+            <artifactId>netty-codec</artifactId>
+            <version>${netty.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>io.netty</groupId>
+            <artifactId>netty-codec-http</artifactId>
+            <version>${netty.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>io.netty</groupId>
+            <artifactId>netty-codec-http2</artifactId>
+            <version>${netty.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.security</groupId>
+            <artifactId>spring-security-core</artifactId>
+            <version>6.5.4</version>
+        </dependency>
+        <dependency>
+            <groupId>org.apache.tomcat.embed</groupId>
+            <artifactId>tomcat-embed-core</artifactId>
+            <version>10.1.44</version>
         </dependency>
 	</dependencies>
 

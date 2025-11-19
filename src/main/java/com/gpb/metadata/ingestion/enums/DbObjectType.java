@@ -1,13 +1,13 @@
 package com.gpb.metadata.ingestion.enums;
 
-public enum Entity {
+public enum DbObjectType {
     DATABASE("database"),
     SCHEMA("schema"),
     TABLE("table");
 
     private final String name;
 
-    Entity(String name) {
+    DbObjectType(String name) {
         this.name = name;
     }
 
@@ -15,10 +15,10 @@ public enum Entity {
         return name;
     }
 
-    public static Entity fromString(String name) {
-        for (Entity entity : Entity.values()) {
-            if (entity.name.equalsIgnoreCase(name)) {
-                return entity;
+    public static DbObjectType fromString(String name) {
+        for (DbObjectType dbObjectType : DbObjectType.values()) {
+            if (dbObjectType.name.equalsIgnoreCase(name)) {
+                return dbObjectType;
             }
         }
         throw new IllegalArgumentException("Unknown entity: " + name);

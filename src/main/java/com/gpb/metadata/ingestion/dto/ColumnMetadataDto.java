@@ -34,6 +34,9 @@ public class ColumnMetadataDto {
     @JsonProperty("constraint")
     private String constraint;
 
+    @JsonProperty("arrayDataType")
+    private String arrayDataType;
+
     /*
      * setter-заглушка с проверкой обязательности заполнения dataLength. Если пусто, то 0
      */

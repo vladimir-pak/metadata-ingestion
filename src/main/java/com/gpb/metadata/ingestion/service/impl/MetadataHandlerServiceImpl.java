@@ -1,23 +1,27 @@
 package com.gpb.metadata.ingestion.service.impl;
 
+import java.net.InetAddress;
+import java.net.URI;
 import java.util.*;
 
+import com.gpb.metadata.ingestion.config.KeycloakConfig;
+import com.gpb.metadata.ingestion.enums.ServiceType;
+import com.gpb.metadata.ingestion.log.SvoiCustomLogger;
+import com.gpb.metadata.ingestion.properties.MetadataSchemasProperties;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpHeaders;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
-import org.springframework.web.client.HttpClientErrorException;
-import org.springframework.web.client.HttpServerErrorException;
 import org.springframework.web.reactive.function.client.WebClient;
 
 import com.gpb.metadata.ingestion.cache.CacheComparisonResult;
 import com.gpb.metadata.ingestion.dto.mapper.MapperDto;
-import com.gpb.metadata.ingestion.enums.Entity;
+import com.gpb.metadata.ingestion.enums.DbObjectType;
 import com.gpb.metadata.ingestion.model.postgres.DatabaseMetadata;
 import com.gpb.metadata.ingestion.model.postgres.SchemaMetadata;
 import com.gpb.metadata.ingestion.model.postgres.TableMetadata;
-import com.gpb.metadata.ingestion.properties.JwtTokenProvider;
 import com.gpb.metadata.ingestion.properties.WebClientProperties;
+import com.gpb.metadata.ingestion.service.KeycloakAuthService;
 import com.gpb.metadata.ingestion.service.MetadataHandlerService;
 
 import lombok.RequiredArgsConstructor;
@@ -34,28 +38,44 @@ public class MetadataHandlerServiceImpl implements MetadataHandlerService {
     private final SchemaMetadataCacheServiceImpl schemaCacheService;
     private final TableMetadataCacheServiceImpl tableCacheService;
     private final MapperDto mapperDto;
-
+    private final SvoiCustomLogger svoiCustomLogger;
 
     private final WebClient webClient;
-    private final JwtTokenProvider tokenProvider;
     private final WebClientProperties webClientProperties;
+    private final MetadataSchemasProperties schemasProperties;
+    private final KeycloakConfig keycloakConfig;
+
+    private final KeycloakAuthService keycloakAuthService;
+    private String token;
 
     @Value("${ord.api.max-connections:5}")
     private Integer maxConn;
 
     @Async
-    public void startAsync(String serviceName) {
-        start(serviceName);
+    public void startAsync(String schemaName, String serviceName) {
+        start(schemaName,serviceName);
     }
 
     @Override
-    public void start(String serviceName) {
-        CacheComparisonResult<DatabaseMetadata> cacheDatabase = 
-            databaseCacheService.synchronizeWithDatabase(serviceName);
+    public void start(String schemaName, String serviceName) {
+        final Map<String, ServiceType> schemaTypeMap = Map.of(
+                schemasProperties.getPostgres(), ServiceType.POSTGRES,
+                schemasProperties.getMssql(), ServiceType.MSSQL,
+                schemasProperties.getOracle(), ServiceType.ORACLE
+        );
+
+        ServiceType type = schemaTypeMap.get(schemaName);
+        if (type == null) {
+            throw new IllegalArgumentException("Неизвестный тип схемы: " + schemaName);
+        }
+        CacheComparisonResult<DatabaseMetadata> cacheDatabase =
+            databaseCacheService.synchronizeWithDatabase(schemaName, serviceName);
         CacheComparisonResult<SchemaMetadata> cacheSchema = 
-            schemaCacheService.synchronizeWithDatabase(serviceName);
+            schemaCacheService.synchronizeWithDatabase(schemaName, serviceName);
         CacheComparisonResult<TableMetadata> cacheTable = 
-            tableCacheService.synchronizeWithDatabase(serviceName);
+            tableCacheService.synchronizeWithDatabase(schemaName, serviceName);
+
+        token = keycloakAuthService.getValidAccessToken();
         
         /*
          * Добавляем сущности в порядке очередности:
@@ -64,13 +84,13 @@ public class MetadataHandlerServiceImpl implements MetadataHandlerService {
          * 3. Таблицы
          */
         Collection<DatabaseMetadata> putDatabases = cacheDatabase.getPutRecords().values();
-        databasePutRequest(putDatabases, webClientProperties.getDatabaseEndpoint(), Entity.DATABASE);
+        databasePutRequest(putDatabases, webClientProperties.getDatabaseEndpoint());
 
         Collection<SchemaMetadata> putSchemas = cacheSchema.getPutRecords().values();
-        schemaPutRequest(putSchemas, webClientProperties.getSchemaEndpoint(), Entity.SCHEMA);
+        schemaPutRequest(putSchemas, webClientProperties.getSchemaEndpoint());
 
         Collection<TableMetadata> putTables = cacheTable.getPutRecords().values();
-        tablePutRequest(putTables, webClientProperties.getTableEndpoint(), Entity.TABLE);
+        tablePutRequest(putTables, webClientProperties.getTableEndpoint(), type);
 
         /*
          * Удаляем сущности в порядке очередности:
@@ -88,12 +108,12 @@ public class MetadataHandlerServiceImpl implements MetadataHandlerService {
         databaseDeleteRequest(toDeleteDatabase, webClientProperties.getDatabaseDeleteEndpoint());
     }
 
-    private void databasePutRequest(Collection<DatabaseMetadata> meta, String endpoint, Entity entity) {
+    private void databasePutRequest(Collection<DatabaseMetadata> meta, String endpoint) {
         Flux.fromIterable(meta)
                 .flatMap(value -> 
-                    putRequest(endpoint, mapperDto.getDto(entity, value), Void.class)
+                    putRequest(endpoint, mapperDto.getDto(DbObjectType.DATABASE, value, null), Void.class)
                         .doOnSuccess(response -> 
-                            log.info("Успешно создано/обновлено {}: {}", entity.name().toLowerCase(), value.getFqn())
+                            log.info("Успешно создано/обновлено {}: {}", DbObjectType.DATABASE.name().toLowerCase(), value.getFqn())
                         )
                         .doOnError(error -> 
                             log.error("Ошибка при создании/обновлении {}: {}", value.getFqn(), error.getMessage())
@@ -122,12 +142,12 @@ public class MetadataHandlerServiceImpl implements MetadataHandlerService {
                 .block(); // Ждем завершения всех
     }
 
-    private void schemaPutRequest(Collection<SchemaMetadata> meta, String endpoint, Entity entity) {
+    private void schemaPutRequest(Collection<SchemaMetadata> meta, String endpoint) {
         Flux.fromIterable(meta)
                 .flatMap(value -> 
-                    putRequest(endpoint, mapperDto.getDto(entity, value), Void.class)
+                    putRequest(endpoint, mapperDto.getDto(DbObjectType.SCHEMA, value, null), Void.class)
                         .doOnSuccess(response -> 
-                            log.info("Успешно создано/обновлено {}: {}", entity.name().toLowerCase(), value.getFqn())
+                            log.info("Успешно создано/обновлено {}: {}", DbObjectType.SCHEMA.name().toLowerCase(), value.getFqn())
                         )
                         .doOnError(error -> 
                             log.error("Ошибка при создании/обновлении {}: {}", value.getFqn(), error.getMessage())
@@ -156,21 +176,21 @@ public class MetadataHandlerServiceImpl implements MetadataHandlerService {
                 .block(); // Ждем завершения всех
     }
 
-    private void tablePutRequest(Collection<TableMetadata> meta, String endpoint, Entity entity) {
+    private void tablePutRequest(Collection<TableMetadata> meta, String endpoint, ServiceType serviceType) {
         Flux.fromIterable(meta)
-            .flatMap(value -> 
-                putRequest(endpoint, mapperDto.getDto(entity, value), Void.class)
-                    .doOnSuccess(response -> 
-                        log.info("Успешно создано/обновлено {}: {}", entity.name().toLowerCase(), value.getFqn())
-                    )
-                    .doOnError(error -> 
-                        log.error("Ошибка при создании/обновлении {}: {}", value.getFqn(), error.getMessage())
-                    )
-                    .onErrorResume(error -> Mono.empty()),
-                maxConn
-            )
-            .then()
-            .block();
+                .flatMap(value ->
+                                putRequest(endpoint, mapperDto.getDto(DbObjectType.TABLE, value, serviceType), Void.class)
+                                        .doOnSuccess(response ->
+                                                log.info("Успешно создано/обновлено {}: {}", DbObjectType.TABLE.name().toLowerCase(), value.getFqn())
+                                        )
+                                        .doOnError(error ->
+                                                log.error("Ошибка при создании/обновлении {}: {}", value.getFqn(), error.getMessage())
+                                        )
+                                        .onErrorResume(error -> Mono.empty()),
+                        maxConn
+                )
+                .then()
+                .block();
     }
 
     private void tableDeleteRequest(Collection<TableMetadata> meta, String endpoint) {
@@ -190,40 +210,115 @@ public class MetadataHandlerServiceImpl implements MetadataHandlerService {
                 .block(); // Ждем завершения всех
     }
 
-    // PUT запрос с динамическим получением токена
     private <T> Mono<T> putRequest(String endpoint, Object requestBody, Class<T> responseType) {
+        OrdaHost orda = parseOrdaHost();
+        long start = System.currentTimeMillis();
+        String username = keycloakConfig.getUsername();
+
         return webClient.put()
-                .uri(uriBuilder -> uriBuilder
-                        .path(endpoint)
-                        .build())
-                .header(HttpHeaders.AUTHORIZATION, "Bearer " + tokenProvider.getToken())
+                .uri(endpoint)
+                .header(HttpHeaders.AUTHORIZATION, "Bearer " + token)
                 .bodyValue(requestBody)
                 .exchangeToMono(response -> {
+
+                    long duration = System.currentTimeMillis() - start;
+
                     if (response.statusCode().isError()) {
+
                         return response.bodyToMono(String.class)
-                                .flatMap(errorBody -> 
-                                    Mono.error(new RuntimeException("HTTP " + response.statusCode() + " - " + errorBody))
-                                );
-                    } else {
-                        return response.bodyToMono(responseType);
+                                .flatMap(err -> {
+                                    svoiCustomLogger.logOrdaRequest(
+                                            endpoint,
+                                            "PUT",
+                                            response.statusCode().value(),
+                                            duration,
+                                            err,
+                                            orda.dns(),
+                                            orda.ip(),
+                                            orda.port(),
+                                            username
+                                    );
+                                    return Mono.error(new RuntimeException(err));
+                                });
                     }
+
+                    svoiCustomLogger.logOrdaRequest(
+                            endpoint,
+                            "PUT",
+                            response.statusCode().value(),
+                            duration,
+                            null,
+                            orda.dns(),
+                            orda.ip(),
+                            orda.port(),
+                            username
+                    );
+
+                    return response.bodyToMono(responseType);
                 });
     }
-    
-    // DELETE запрос с динамическим получением токена
+
     private Mono<Void> deleteRequest(String endpoint) {
-        log.info("Endpoint for deletion: {}", endpoint);
+
+        OrdaHost orda = parseOrdaHost();
+        long start = System.currentTimeMillis();
+        String username = keycloakConfig.getUsername();
+
         return webClient.delete()
                 .uri(uriBuilder -> uriBuilder
                         .path(endpoint)
                         .queryParam("recursive", "true")
                         .build())
-                .header(HttpHeaders.AUTHORIZATION, "Bearer " + tokenProvider.getToken())
-                .retrieve()
-                .onStatus(status -> status.is4xxClientError(), response -> 
-                    Mono.error(new HttpClientErrorException(response.statusCode())))
-                .onStatus(status -> status.is5xxServerError(), response -> 
-                    Mono.error(new HttpServerErrorException(response.statusCode())))
-                .bodyToMono(Void.class);
+                .header(HttpHeaders.AUTHORIZATION, "Bearer " + token)
+                .exchangeToMono(response -> {
+
+                    long duration = System.currentTimeMillis() - start;
+
+                    if (response.statusCode().isError()) {
+                        return response.bodyToMono(String.class)
+                                .flatMap(err -> {
+                                    svoiCustomLogger.logOrdaRequest(
+                                            endpoint,
+                                            "DELETE",
+                                            response.statusCode().value(),
+                                            duration,
+                                            err,
+                                            orda.dns(),
+                                            orda.ip(),
+                                            orda.port(),
+                                            username
+                                    );
+                                    return Mono.error(new RuntimeException(err));
+                                });
+                    }
+
+                    svoiCustomLogger.logOrdaRequest(
+                            endpoint,
+                            "DELETE",
+                            response.statusCode().value(),
+                            duration,
+                            null,
+                            orda.dns(),
+                            orda.ip(),
+                            orda.port(),
+                            username
+                    );
+
+                    return Mono.empty();
+                });
+    }
+
+    private record OrdaHost(String dns, String ip, int port) {}
+
+    private OrdaHost parseOrdaHost() {
+        try {
+            URI uri = new URI(webClientProperties.getBaseUrl());
+            String dns = uri.getHost();
+            int port = uri.getPort() == -1 ? 443 : uri.getPort();
+            String ip = InetAddress.getByName(dns).getHostAddress();
+            return new OrdaHost(dns, ip, port);
+        } catch (Exception e) {
+            return new OrdaHost("unknown", "unknown", 443);
+        }
     }
 }
