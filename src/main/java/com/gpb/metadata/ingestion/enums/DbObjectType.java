@@ -14,13 +14,4 @@ public enum DbObjectType {
     public String getName() {
         return name;
     }
-
-    public static DbObjectType fromString(String name) {
-        for (DbObjectType dbObjectType : DbObjectType.values()) {
-            if (dbObjectType.name.equalsIgnoreCase(name)) {
-                return dbObjectType;
-            }
-        }
-        throw new IllegalArgumentException("Unknown entity: " + name);
-    }
 }

@@ -17,7 +17,6 @@ import java.util.Base64;
 @Component
 @RequiredArgsConstructor
 public class CustomAuthenticationEntryPoint implements AuthenticationEntryPoint {
-
     private final SvoiCustomLogger svoiLogger;
 
     @Override

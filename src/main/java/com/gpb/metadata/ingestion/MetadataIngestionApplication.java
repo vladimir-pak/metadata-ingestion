@@ -35,19 +35,20 @@ public class MetadataIngestionApplication {
 	private final LogRepository logRepository;
 	private final ConfigurableEnvironment configurableEnvironment;
 	private static ConfigurableApplicationContext applicationContext;
+
 	@PostConstruct
 	public void startupApplication() {
 		logPartitionRepository.createTodayPartition();
 		svoiCustomLogger.sendInternal("startService", "Start Service", "Started service", SvoiSeverityEnum.ONE);
-
 		checkConfigChanges();
 	}
+
 	private void checkConfigChanges() {
 		String props = Utils.getSources(configurableEnvironment.getPropertySources());
 		String propsHash = Utils.getHash(props, "SHA-256");
 		String localHostName = getHostName();
-
 		Log logEntity = logRepository.findLatestByType("checkConfig", localHostName);
+
 		if (logEntity == null) {
 			svoiCustomLogger.sendInternal("checkConfig", "Check Config", propsHash, SvoiSeverityEnum.ONE);
 		} else {
@@ -71,18 +72,9 @@ public class MetadataIngestionApplication {
 	public static void main(String[] args) {
 		SpringApplication.run(MetadataIngestionApplication.class, args);
 	}
+
 	@PreDestroy
 	public void shutdownApplication() {
 		svoiCustomLogger.sendInternal("stopService", "Stop Service", "Stopped service", SvoiSeverityEnum.ONE);
-	}
-
-	public static void restart() {
-		ApplicationArguments args = applicationContext.getBean(ApplicationArguments.class);
-		Thread thread = new Thread(() -> {
-			applicationContext.close();
-			applicationContext = SpringApplication.run(MetadataIngestionApplication.class, args.getSourceArgs());
-		});
-		thread.setDaemon(false);
-		thread.start();
 	}
 }

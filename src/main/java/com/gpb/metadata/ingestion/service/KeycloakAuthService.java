@@ -11,7 +11,6 @@ import com.gpb.metadata.ingestion.dto.KeycloakTokenResponse;
 
 @Service
 public class KeycloakAuthService {
-
     private final KeycloakConfig props;
     private final RestTemplate restTemplate = new RestTemplate();
 
@@ -60,7 +59,6 @@ public class KeycloakAuthService {
         try {
             return postForToken(form);
         } catch (Exception e) {
-            // refresh не сработал, возвращаем новый токен через логин
             return fetchToken();
         }
     }

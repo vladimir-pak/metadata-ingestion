@@ -3,7 +3,6 @@ package com.gpb.metadata.ingestion.enums;
 import java.util.Set;
 
 public enum ConstraintType {
-
     UNIQUE,
     PRIMARY_KEY,
     FOREIGN_KEY,

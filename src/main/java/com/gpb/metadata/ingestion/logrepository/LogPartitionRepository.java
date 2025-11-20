@@ -16,11 +16,9 @@ import java.util.List;
 @Slf4j
 @Repository
 public class LogPartitionRepository {
-
     private final JdbcTemplate logsJdbcTemplate;
     private final CleanDatabaseLogsProperties cleanDatabaseLogs;
     private final LogsDatabaseProperties logsDatabaseProperties;
-
     private final SvoiCustomLogger svoiCustomLogger;
 
     public LogPartitionRepository(
@@ -65,7 +63,6 @@ public class LogPartitionRepository {
             return;
         }
         LocalDate dateToDelete = LocalDate.now().minusDays(cleanDatabaseLogs.getCleanPeriod());
-
         String fullTableName = logsDatabaseProperties.getTable().trim();
         String table = fullTableName;
         String schema = "public";

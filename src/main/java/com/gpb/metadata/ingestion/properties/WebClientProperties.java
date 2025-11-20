@@ -12,7 +12,6 @@ import lombok.Setter;
 @Setter
 public class WebClientProperties {
     private String baseUrl;
-
     private Endpoints endpoints = new Endpoints();
     
     @Getter

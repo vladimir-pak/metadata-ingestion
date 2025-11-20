@@ -33,40 +33,25 @@ public class IgniteConfig {
     public Ignite igniteInstance() {
         IgniteConfiguration cfg = new IgniteConfiguration();
 
-        // Основные настройки
         cfg.setIgniteInstanceName("metadata-ingestion-cache");
         cfg.setPeerClassLoadingEnabled(true);
         cfg.setClientMode(false);
 
-        // Конфигурация хранилища
         DataStorageConfiguration storageCfg = new DataStorageConfiguration();
-
-        // Создаем регион памяти с persistence
-//        DataRegionConfiguration dataRegionConfig = new DataRegionConfiguration();
-//        dataRegionConfig.setName("Default_Region");
-//        dataRegionConfig.setInitialSize(1L * 1024 * 1024 * 1024); // 1 GB
-//        dataRegionConfig.setMaxSize(4L * 1024 * 1024 * 1024); // 4 GB
-//        dataRegionConfig.setPersistenceEnabled(true); // Включаем persistence
-
         DataRegionConfiguration dataRegionConfig = new DataRegionConfiguration()
                 .setName("Default_Region")
-                .setInitialSize(256L * 1024 * 1024) // 256 MB
-                .setMaxSize(512L * 1024 * 1024)     // 512 MB
+                .setInitialSize(256L * 1024 * 1024)
+                .setMaxSize(512L * 1024 * 1024)
                 .setPersistenceEnabled(true);
 
-
-
-        // Устанавливаем регион по умолчанию
         storageCfg.setDefaultDataRegionConfiguration(dataRegionConfig);
 
-        // Папка для хранения данных Ignite
         storageCfg.setStoragePath(persistenceStoragePath);
         storageCfg.setWalPath(persistenceWalPath);
         storageCfg.setWalArchivePath(persistenceWalArchivePath);
 
         cfg.setDataStorageConfiguration(storageCfg);
 
-        // Discovery SPI (локальный кластер)
         TcpDiscoverySpi discoverySpi = new TcpDiscoverySpi();
         TcpDiscoveryVmIpFinder ipFinder = new TcpDiscoveryVmIpFinder();
         ipFinder.setAddresses(Arrays.asList("127.0.0.1:47500"));
@@ -74,7 +59,6 @@ public class IgniteConfig {
         discoverySpi.setJoinTimeout(3000);
         cfg.setDiscoverySpi(discoverySpi);
 
-        // Communication SPI
         TcpCommunicationSpi commSpi = new TcpCommunicationSpi();
         commSpi.setLocalPort(47100);
         cfg.setCommunicationSpi(commSpi);

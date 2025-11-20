@@ -11,7 +11,6 @@ import org.springframework.stereotype.Service;
 
 @Service
 public class SchemaMetadataCacheServiceImpl extends AbstractMetadataCacheService<SchemaMetadata> {
-    
     public SchemaMetadataCacheServiceImpl(
             @Qualifier("igniteInstance") Ignite ignite,
             SchemaMetadataCacheRepository repository) {

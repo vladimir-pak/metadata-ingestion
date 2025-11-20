@@ -34,14 +34,6 @@ public class DatabaseMetadataCacheRepository implements MetadataRepository<Datab
         return jdbcTemplate.query(sql, this::mapRow, serviceName);
     }
 
-    /**
-     * Удалить все записи по serviceName из нужной схемы
-     */
-    public void deleteByServiceName(String schema, String serviceName) {
-        String sql = String.format("DELETE FROM %s.database_metadata WHERE service_name = ?", schema);
-        jdbcTemplate.update(sql, serviceName);
-    }
-
     private DatabaseMetadata mapRow(ResultSet rs, int rowNum) throws SQLException {
         DatabaseMetadata entity = new DatabaseMetadata();
         EntityId id = new EntityId(

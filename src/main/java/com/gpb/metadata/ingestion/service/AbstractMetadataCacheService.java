@@ -66,7 +66,6 @@ public abstract class AbstractMetadataCacheService<T extends Metadata> {
 
         IgniteCache<EntityId, T> tempCache = ignite.getOrCreateCache(tempCacheCfg);
 
-        // Загружаем данные из БД
         List<T> dbData = repository.findByServiceName(schemaName, serviceName);
         Map<EntityId, T> tempData = dbData.stream()
                 .collect(Collectors.toMap(
@@ -191,24 +190,6 @@ public abstract class AbstractMetadataCacheService<T extends Metadata> {
                 .forEach(entry -> keys.add(entry.getKey()));
 
         return keys;
-    }
-
-    /**
-     * Удалить runtime кэш для serviceName
-     */
-    public void destroyRuntimeCache(String schemaName, String serviceName) {
-        String cacheKey = schemaName + "_" + serviceName;
-        IgniteCache<EntityId, T> cache = runtimeCaches.remove(cacheKey);
-        if (cache != null) {
-            cache.destroy();
-        }
-    }
-
-    /**
-     * Получить все runtime кэши
-     */
-    public Set<String> getAllRuntimeCaches() {
-        return new HashSet<>(runtimeCaches.keySet());
     }
 
     /**

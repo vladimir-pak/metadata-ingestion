@@ -33,19 +33,16 @@ import reactor.core.publisher.Mono;
 @RequiredArgsConstructor
 @Slf4j
 public class MetadataHandlerServiceImpl implements MetadataHandlerService {
-
     private final DatabaseMetadataCacheServiceImpl databaseCacheService;
     private final SchemaMetadataCacheServiceImpl schemaCacheService;
     private final TableMetadataCacheServiceImpl tableCacheService;
     private final MapperDto mapperDto;
     private final SvoiCustomLogger svoiCustomLogger;
-
     private final WebClient webClient;
     private final WebClientProperties webClientProperties;
     private final MetadataSchemasProperties schemasProperties;
     private final KeycloakConfig keycloakConfig;
 
-    private final KeycloakAuthService keycloakAuthService;
     private String token;
 
     @Value("${ord.api.max-connections:5}")
@@ -70,13 +67,13 @@ public class MetadataHandlerServiceImpl implements MetadataHandlerService {
         }
         CacheComparisonResult<DatabaseMetadata> cacheDatabase =
             databaseCacheService.synchronizeWithDatabase(schemaName, serviceName);
-        CacheComparisonResult<SchemaMetadata> cacheSchema = 
+        CacheComparisonResult<SchemaMetadata> cacheSchema =
             schemaCacheService.synchronizeWithDatabase(schemaName, serviceName);
-        CacheComparisonResult<TableMetadata> cacheTable = 
+        CacheComparisonResult<TableMetadata> cacheTable =
             tableCacheService.synchronizeWithDatabase(schemaName, serviceName);
 
-        token = keycloakAuthService.getValidAccessToken();
-        
+        token = "eyJraWQiOiJHYjM4OWEtOWY3Ni1nZGpzLWE5MmotMDI0MmJrOTQzNTYiLCJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJvcGVuLW1ldGFkYXRhLm9yZyIsInN1YiI6InN2cy5uaWsiLCJlbWFpbCI6InN2cy5uaWtAYmsucnUiLCJpc0JvdCI6dHJ1ZSwidG9rZW5UeXBlIjoiQk9UIiwiaWF0IjoxNzYzNTUxNzIxLCJleHAiOm51bGx9.gqygIHAGa-qWcAOz8CuhdHFBH3Frs9DBIf-j-46DIGCLsJMyfpcwFKPsbcWdfTYz7YiDC-z2UO8sI15zRFQgNKgjJeM6PLw2HAzsQkdSdk7enK57q93CGCpnv2sSgjwFWCTc-_Sc-XY_-wGvRSFeEZasCwzGfmc5kU5fKnWMw1AJckPTwG3Rg8OUuIc9d4XkegsUn_nDyu9SyJO0c05QcTzxaAu-n3wdZUMNfKvuFY-ykcYE__1ftgD-5cBmam4hJwxjYxEZUGbjo9pZbwm0xrkkrPeFe01-vMSjXIyNy2lXRSFQsVkX8WQpFKjTbWBOh7uEQGfTlo23ModMqeGmQA";
+
         /*
          * Добавляем сущности в порядке очередности:
          * 1. БД
@@ -110,70 +107,70 @@ public class MetadataHandlerServiceImpl implements MetadataHandlerService {
 
     private void databasePutRequest(Collection<DatabaseMetadata> meta, String endpoint) {
         Flux.fromIterable(meta)
-                .flatMap(value -> 
+                .flatMap(value ->
                     putRequest(endpoint, mapperDto.getDto(DbObjectType.DATABASE, value, null), Void.class)
-                        .doOnSuccess(response -> 
+                        .doOnSuccess(response ->
                             log.info("Успешно создано/обновлено {}: {}", DbObjectType.DATABASE.name().toLowerCase(), value.getFqn())
                         )
-                        .doOnError(error -> 
+                        .doOnError(error ->
                             log.error("Ошибка при создании/обновлении {}: {}", value.getFqn(), error.getMessage())
                         )
                         .onErrorResume(error -> Mono.empty()),
                     maxConn
                 )
-                .then() // Преобразуем в Mono<Void>
-                .block(); // Ждем завершения всех
+                .then()
+                .block();
     }
 
     private void databaseDeleteRequest(Collection<DatabaseMetadata> meta, String endpoint) {
         Flux.fromIterable(meta)
-                .flatMap(value -> 
+                .flatMap(value ->
                     deleteRequest(String.format("%s/%s", endpoint, value.getFqn()))
-                        .doOnSuccess(response -> 
+                        .doOnSuccess(response ->
                             log.info("Успешно удалено {}", value.getFqn())
                         )
-                        .doOnError(error -> 
+                        .doOnError(error ->
                             log.error("Ошибка при удалении {}: {}", value.getFqn(), error.getMessage())
                         )
                         .onErrorResume(error -> Mono.empty()),
                     maxConn
                 )
-                .then() // Преобразуем в Mono<Void>
-                .block(); // Ждем завершения всех
+                .then()
+                .block();
     }
 
     private void schemaPutRequest(Collection<SchemaMetadata> meta, String endpoint) {
         Flux.fromIterable(meta)
-                .flatMap(value -> 
+                .flatMap(value ->
                     putRequest(endpoint, mapperDto.getDto(DbObjectType.SCHEMA, value, null), Void.class)
-                        .doOnSuccess(response -> 
+                        .doOnSuccess(response ->
                             log.info("Успешно создано/обновлено {}: {}", DbObjectType.SCHEMA.name().toLowerCase(), value.getFqn())
                         )
-                        .doOnError(error -> 
+                        .doOnError(error ->
                             log.error("Ошибка при создании/обновлении {}: {}", value.getFqn(), error.getMessage())
                         )
                         .onErrorResume(error -> Mono.empty()),
                     maxConn
                 )
-                .then() // Преобразуем в Mono<Void>
-                .block(); // Ждем завершения всех
+                .then()
+                .block();
     }
 
     private void schemaDeleteRequest(Collection<SchemaMetadata> meta, String endpoint) {
         Flux.fromIterable(meta)
-                .flatMap(value -> 
+                .flatMap(value ->
                     deleteRequest(String.format("%s/%s", endpoint, value.getFqn()))
-                        .doOnSuccess(response -> 
+                        .doOnSuccess(response ->
                             log.info("Успешно удалено {}", value.getFqn())
                         )
-                        .doOnError(error -> 
+                        .doOnError(error ->
                             log.error("Ошибка при удалении {}: {}", value.getFqn(), error.getMessage())
                         )
                         .onErrorResume(error -> Mono.empty()),
                     maxConn
                 )
-                .then() // Преобразуем в Mono<Void>
-                .block(); // Ждем завершения всех
+                .then()
+                .block();
     }
 
     private void tablePutRequest(Collection<TableMetadata> meta, String endpoint, ServiceType serviceType) {
@@ -195,19 +192,19 @@ public class MetadataHandlerServiceImpl implements MetadataHandlerService {
 
     private void tableDeleteRequest(Collection<TableMetadata> meta, String endpoint) {
         Flux.fromIterable(meta)
-                .flatMap(value -> 
+                .flatMap(value ->
                     deleteRequest(String.format("%s/%s", endpoint, value.getFqn()))
-                        .doOnSuccess(response -> 
+                        .doOnSuccess(response ->
                             log.info("Успешно удалено {}", value.getFqn())
                         )
-                        .doOnError(error -> 
+                        .doOnError(error ->
                             log.error("Ошибка при удалении {}: {}", value.getFqn(), error.getMessage())
                         )
                         .onErrorResume(error -> Mono.empty()),
                     maxConn
                 )
-                .then() // Преобразуем в Mono<Void>
-                .block(); // Ждем завершения всех
+                .then()
+                .block();
     }
 
     private <T> Mono<T> putRequest(String endpoint, Object requestBody, Class<T> responseType) {
@@ -220,11 +217,8 @@ public class MetadataHandlerServiceImpl implements MetadataHandlerService {
                 .header(HttpHeaders.AUTHORIZATION, "Bearer " + token)
                 .bodyValue(requestBody)
                 .exchangeToMono(response -> {
-
                     long duration = System.currentTimeMillis() - start;
-
                     if (response.statusCode().isError()) {
-
                         return response.bodyToMono(String.class)
                                 .flatMap(err -> {
                                     svoiCustomLogger.logOrdaRequest(

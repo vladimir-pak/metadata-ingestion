@@ -1,6 +1,6 @@
 package com.gpb.metadata.ingestion.enums;
 
-/*
+/**
  * Класс с типами данных ОРДы, для которых dataLength должен быть заполнен
  */
 public enum TypesWithDataLength {
@@ -10,11 +10,9 @@ public enum TypesWithDataLength {
     VARBINARY;
     
     public static String getProcessedDataLength(String dataType, String dataLength) {
-        // Если тип не поддерживается или dataType null, возвращаем исходное значение
         if (!isSupportedType(dataType)) {
             return dataLength;
         }
-        // Если тип поддерживается и dataLength null, возвращаем "0"
         return dataLength == null ? "0" : dataLength;
     }
     

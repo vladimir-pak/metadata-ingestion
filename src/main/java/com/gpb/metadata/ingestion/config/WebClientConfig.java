@@ -12,9 +12,8 @@ import com.gpb.metadata.ingestion.properties.WebClientProperties;
 @Configuration
 @EnableConfigurationProperties(WebClientProperties.class)
 public class WebClientConfig {
-
     private final WebClientProperties webClientProperties;
-    
+
     public WebClientConfig(WebClientProperties webClientProperties) {
         this.webClientProperties = webClientProperties;
     }

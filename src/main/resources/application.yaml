@@ -9,14 +9,12 @@ spring:
     user: test_user
     ip: test_ip
     host: test_dns
-    port: test_port
 
   datasource:
-    url: ${DB_URL:jdbc:postgresql://localhost:5432/meta_base}
-    username: ${DB_USER:postgres}
-    password: ${DB_PASSWORD:kampus}
+    url: ${DB_URL:jdbc:postgresql://localhost:5432/postgres}
+    username: ${DB_USER:user}
+    password: ${DB_PASSWORD:password}
     driverClassName: org.postgresql.Driver
-    # driverClassName: org.apache.ignite.IgniteJdbcThinDriver
     hikari:
       maximum-pool-size: 20
       connection-timeout: 30000
@@ -42,9 +40,10 @@ spring:
     schemas: postgres_metadata
     enabled: true
     locations: classpath:db/migration
-    url: jdbc:postgresql://localhost:5432/meta_base
-    user: postgres
-    password: kampus
+    url: ${DB_URL:jdbc:postgresql://localhost:5432/postgres}
+    user: ${DB_USER:user}
+    password: ${DB_PASSWORD:password}
+
 
   tomcat:
     max-connections: 100 # Максимальное количество соединений
@@ -74,15 +73,12 @@ keycloak:
   username: service-user
   password: service-pass
 
-jwt:
-  token: eyJraWQiOiJHYjM4OWEtOWY3Ni1nZGpzLWE5MmotMDI0MmJrOTQzNTYiLCJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJvcGVuLW1ldGFkYXRhLm9yZyIsInN1YiI6ImFkbWluIiwiZW1haWwiOiJhZG1pbkBvcGVubWV0YWRhdGEub3JnIiwiaXNCb3QiOmZhbHNlLCJ0b2tlblR5cGUiOiJQRVJTT05BTF9BQ0NFU1MiLCJpYXQiOjE3NjA0Mzk3MDQsImV4cCI6bnVsbH0.on5MXkOV22bRcrK0KUiT9LqQQIc463BjTOXiz64UJyCJxoWMhd9KMu6r9w_8knHS7Zmf6HVuJw_VqYA1yXL2wOXZyF8bDutFd0YlQbhLZKxsh2aJ6bI8kxiEWbmhixESoEVQJ4Qa3lzBPY6SFsJdnS7N1rD8Kr13pM2szTnGcX98-ggO0gQFja4LecsHMBNCyFFuIZVIoHlyPA_-JirdxPxMIhmHGHbPXRAPI0gzsWXRIDx0lOhBsPbtXw6vnL0DYSa0NzYRgCMT9ouHhWuP6gbUXF-IFgPvAu_47qnWBldC9g9v7VW-YgbG7FiD1OPlMFgVtWtL7mL-wZrkA_54mA
-
 logs-database:
   enabled: true
   task-create-partition: 0 0 0 * * ?
-  url: jdbc:postgresql://localhost:5432/db_log
-  username: postgres
-  password: kampus
+  url: ${DB_URL:jdbc:postgresql://localhost:5432/db_name}
+  username: ${DB_USER:user}
+  password: ${DB_PASSWORD:password}
   driverClassName: org.postgresql.Driver
   table: "audit.jdata_orda_sync_log"
 

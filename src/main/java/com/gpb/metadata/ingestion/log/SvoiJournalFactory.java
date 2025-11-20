@@ -39,13 +39,6 @@ public class SvoiJournalFactory {
         return svoiJournal;
     }
 
-    public SvoiJournal getJournalTarget() {
-        SvoiJournal svoiJournal = this.getBaseJournal();
-        svoiJournal.setDvchost(this.getLocalHostName());
-        svoiJournal.setEnd(LocalDateTime.now());
-        return svoiJournal;
-    }
-
     private SvoiJournal getBaseJournal() {
         LocalDateTime now = LocalDateTime.now();
         SvoiJournal svoiJournal = new SvoiJournal(this.nextLineNumber(), DATE_FORMATTER);

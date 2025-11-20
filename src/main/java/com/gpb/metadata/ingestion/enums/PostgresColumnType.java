@@ -4,9 +4,9 @@ import java.util.HashMap;
 import java.util.Map;
 
 public enum PostgresColumnType implements OrdaColumnTypeMapper{
-    MPAA_RATING("VARCHAR"),          // можно замапить как строку
-    TEXT_ARRAY("ARRAY"),             // TEXT[] → ARRAY
-    TIME_WITHOUT_TIME_ZONE("TIME"),  // аналог TIME
+    MPAA_RATING("VARCHAR"),
+    TEXT_ARRAY("ARRAY"),
+    TIME_WITHOUT_TIME_ZONE("TIME"),
     ARRAY("ARRAY"),
     BIGINT("BIGINT"),
     BIGNUMERIC("NUMERIC"),
@@ -211,8 +211,6 @@ public enum PostgresColumnType implements OrdaColumnTypeMapper{
         for (PostgresColumnType type : values()) {
             LOOKUP.put(type.name(), type);
         }
-
-        // алиасы для "нестандартных" названий из Postgres
         LOOKUP.put("TEXT[]", TEXT_ARRAY);
         LOOKUP.put("TIME_WITHOUT_TIME_ZONE", TIME_WITHOUT_TIME_ZONE);
         LOOKUP.put("MPAA_RATING", MPAA_RATING);

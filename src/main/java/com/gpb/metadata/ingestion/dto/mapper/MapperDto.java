@@ -21,12 +21,10 @@ import com.gpb.metadata.ingestion.model.postgres.SchemaMetadata;
 import com.gpb.metadata.ingestion.model.postgres.TableMetadata;
 import com.gpb.metadata.ingestion.model.schema.TableData;
 
-
 @Slf4j
 @Configuration
 @RequiredArgsConstructor
 public class MapperDto {
-
     private final ColumnTypeMapperService columnTypeMapperService;
 
     public Object getDto(DbObjectType dbObjectType, Metadata metadata, ServiceType serviceType) {
@@ -113,7 +111,7 @@ public class MapperDto {
 
     private String resolveArrayType(String sourceType, String processedType) {
         if (sourceType == null || !"ARRAY".equalsIgnoreCase(processedType)) {
-            return null; // только для ARRAY
+            return null;
         }
 
         if (sourceType.endsWith("[]")) {

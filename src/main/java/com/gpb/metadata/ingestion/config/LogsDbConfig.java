@@ -1,6 +1,5 @@
 package com.gpb.metadata.ingestion.config;
 
-
 import com.gpb.metadata.ingestion.properties.LogsDatabaseProperties;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Qualifier;
@@ -14,7 +13,6 @@ import javax.sql.DataSource;
 @Configuration
 @RequiredArgsConstructor
 public class LogsDbConfig {
-
     private final LogsDatabaseProperties logsDatabaseProperties;
 
     @Bean(name = "logsDataSource")

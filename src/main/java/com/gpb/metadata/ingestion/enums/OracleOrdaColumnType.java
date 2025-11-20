@@ -40,7 +40,7 @@ public enum OracleOrdaColumnType implements OrdaColumnTypeMapper {
     UROWID("VARCHAR"),
 
     // Прочие
-    BOOLEAN("BOOLEAN"), // в Oracle 12c+ можно использовать в PL/SQL
+    BOOLEAN("BOOLEAN"),
     JSON("JSON"),
 
     UNKNOWN("UNKNOWN");

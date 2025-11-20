@@ -14,16 +14,12 @@ import java.time.format.DateTimeFormatter;
 @Service
 @RequiredArgsConstructor
 public class CefLogFileService {
-
     private static final Logger log = LoggerFactory.getLogger(CefLogFileService.class);
+    private static final DateTimeFormatter FILE_TS = DateTimeFormatter.ofPattern("dd.MM.yyyy HH:mm:ss");
+    private static final DateTimeFormatter FILE_DATE = DateTimeFormatter.ofPattern("yyyy-MM-dd");
+    private static final ZoneId ZONE = ZoneId.systemDefault();
 
     private final CefLoggingProperties properties;
-
-    private static final DateTimeFormatter FILE_TS =
-            DateTimeFormatter.ofPattern("dd.MM.yyyy HH:mm:ss");
-    private static final DateTimeFormatter FILE_DATE =
-            DateTimeFormatter.ofPattern("yyyy-MM-dd");
-    private static final ZoneId ZONE = ZoneId.systemDefault();
 
     public Path getDailyLogPath() {
         return Paths.get(properties.getPath() + ".log");
