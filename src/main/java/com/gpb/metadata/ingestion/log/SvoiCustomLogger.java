@@ -127,7 +127,7 @@ public class SvoiCustomLogger {
                     ip
             );
 
-            send("authSuccess", "Invalid Login or Password", message,
+            send("authSuccess", "Authentication success", message,
                     SvoiSeverityEnum.FIVE, journal);
 
         } catch (Exception ex) {
