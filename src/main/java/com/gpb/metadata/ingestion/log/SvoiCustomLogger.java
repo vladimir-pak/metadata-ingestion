@@ -43,7 +43,7 @@ public class SvoiCustomLogger {
 
             String extendedMessage = message;
             if (dto != null && dto.getServiceName() != null) {
-                extendedMessage += " serviceName=" + dto.getServiceName();
+                extendedMessage += " serviceName: " + dto.getServiceName() + ";";
             }
 
             send("apiCall",
@@ -91,12 +91,12 @@ public class SvoiCustomLogger {
             String msg;
             if (error == null) {
                 msg = String.format(
-                        "ordaApiCall method=%s endpoint=%s status=%d duration=%dms",
+                        "ordaApiCall method: %s; endpoint: %s; status: %d; duration: %dms;",
                         method, endpoint, status, durationMs
                 );
             } else {
                 msg = String.format(
-                        "ordaApiCall method=%s endpoint=%s status=%d duration=%dms error=%s",
+                        "ordaApiCall method: %s; endpoint: %s; status: %d; duration: %dms; error: %s;",
                         method, endpoint, status, durationMs, error
                 );
             }
@@ -122,7 +122,7 @@ public class SvoiCustomLogger {
             journal.setSuser(username);
 
             String message = String.format(
-                    "Authenticated user=%s ip=%s",
+                    "Authenticated user: %s; ip: %s;",
                     username != null ? username : "unknown",
                     ip
             );
@@ -143,7 +143,7 @@ public class SvoiCustomLogger {
             journal.setSuser(username);
 
             String message = String.format(
-                    "authFailed invalidCredentials user=%s endpoint=%s ip=%s",
+                    "authFailed invalidCredentials user: %s; endpoint: %s; ip: %s;",
                     username != null ? username : "unknown",
                     endpoint,
                     ip
