@@ -1,6 +1,7 @@
 package com.gpb.metadata.ingestion.log;
 
 
+import com.gpb.metadata.ingestion.dto.RequestBodyDto;
 import com.gpb.metadata.ingestion.logrepository.Log;
 import com.gpb.metadata.ingestion.logrepository.LogRepository;
 import com.gpb.metadata.ingestion.properties.LogsDatabaseProperties;
@@ -36,22 +37,35 @@ public class SvoiCustomLogger {
         this.logRepository = logRepository;
     }
 
-    public void logApiCall(HttpServletRequest request, String message) {
+    public void logApiCall(HttpServletRequest request, String message, RequestBodyDto dto) {
         try {
-            String clientIp = request.getRemoteAddr();
-            String clientHost = request.getRemoteHost();
-            int clientPort = request.getRemotePort();
+            SvoiJournal journal = prepareJournalFromRequest(request);
 
-            SvoiJournal journal = svoiJournalFactory.getJournalSource();
-            journal.setShost(clientHost);
-            journal.setSrc(clientIp);
-            journal.setSpt(clientPort);
+            String extendedMessage = message;
+            if (dto != null && dto.getServiceName() != null) {
+                extendedMessage += " serviceName=" + dto.getServiceName();
+            }
 
-            send("apiCall", "API Request", message, SvoiSeverityEnum.ONE, journal);
+            send("apiCall",
+                    "Metadata Synchronization Request",
+                    extendedMessage,
+                    SvoiSeverityEnum.ONE,
+                    journal);
 
         } catch (Exception e) {
             log.error("Ошибка при логировании вызова API", e);
         }
+    }
+
+    private SvoiJournal prepareJournalFromRequest(HttpServletRequest request) {
+        SvoiJournal journal = prepareJournalBase();
+
+        journal.setSrc(request.getRemoteAddr());
+        journal.setShost(request.getRemoteHost());
+        journal.setSpt(request.getRemotePort());
+        journal.setApp("https");
+
+        return journal;
     }
 
     public void logOrdaRequest(String endpoint,
