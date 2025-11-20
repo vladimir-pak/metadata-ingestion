@@ -24,13 +24,17 @@ public class LogScheduler {
     @Scheduled(cron = "${clean-database-logs.task-cleaner-schedule}")
     public void cleanPartition() {
         logPartitionRepository.dropOldPartitions();
-        svoiCustomLogger.sendInternal("cleanLogs", "Clean Logs", "Cleaned old logs", SvoiSeverityEnum.ONE);
     }
 
     @Scheduled(cron = "${clean-database-logs.task-cleaner-schedule}")
     public void cleanupOldLogs() {
         cefLogger.rotateLogFile();
         cefLogger.cleanupOldLogs();
-        svoiCustomLogger.sendInternal("cleanupOldLogs", "Cleanup Old Log Files", "cleanup executed", SvoiSeverityEnum.ONE);
+        svoiCustomLogger.sendInternal(
+                "cleanLogs",
+                "Clean Log Files",
+                "Cleaned old log files",
+                SvoiSeverityEnum.ONE
+        );
     }
 }

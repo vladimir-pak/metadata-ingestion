@@ -15,7 +15,7 @@ public class SvoiJournal {
     private static final String EQUALS = "=";
     private static final String SPACE = " ";
     private DateTimeFormatter sdf;
-    private static final String DEVICE_VENDOR = "OmniPlatform";
+    private static final String DEVICE_VENDOR = "ORD";
     private String time;
     private String deviceProduct;
     private String deviceVersion;

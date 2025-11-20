@@ -1,6 +1,7 @@
 package com.gpb.metadata.ingestion.log;
 
 
+import com.gpb.metadata.ingestion.dto.RequestBodyDto;
 import com.gpb.metadata.ingestion.logrepository.Log;
 import com.gpb.metadata.ingestion.logrepository.LogRepository;
 import com.gpb.metadata.ingestion.properties.LogsDatabaseProperties;
@@ -36,22 +37,35 @@ public class SvoiCustomLogger {
         this.logRepository = logRepository;
     }
 
-    public void logApiCall(HttpServletRequest request, String message) {
+    public void logApiCall(HttpServletRequest request, String message, RequestBodyDto dto) {
         try {
-            String clientIp = request.getRemoteAddr();
-            String clientHost = request.getRemoteHost();
-            int clientPort = request.getRemotePort();
+            SvoiJournal journal = prepareJournalFromRequest(request);
 
-            SvoiJournal journal = svoiJournalFactory.getJournalSource();
-            journal.setShost(clientHost);
-            journal.setSrc(clientIp);
-            journal.setSpt(clientPort);
+            String extendedMessage = message;
+            if (dto != null && dto.getServiceName() != null) {
+                extendedMessage += " serviceName=" + dto.getServiceName();
+            }
 
-            send("metadataSyncCall", "API Request", message, SvoiSeverityEnum.ONE, journal);
+            send("apiCall",
+                    "Metadata Synchronization Request",
+                    extendedMessage,
+                    SvoiSeverityEnum.ONE,
+                    journal);
 
         } catch (Exception e) {
             log.error("Ошибка при логировании вызова API", e);
         }
+    }
+
+    private SvoiJournal prepareJournalFromRequest(HttpServletRequest request) {
+        SvoiJournal journal = prepareJournalBase();
+
+        journal.setSrc(request.getRemoteAddr());
+        journal.setShost(request.getRemoteHost());
+        journal.setSpt(request.getRemotePort());
+        journal.setApp("https");
+
+        return journal;
     }
 
     public void logOrdaRequest(String endpoint,
@@ -68,9 +82,11 @@ public class SvoiCustomLogger {
             SvoiJournal journal = prepareJournalBase();
 
             journal.setDhost(ordaDns);
+            journal.setDvchost(ordaDns);
             journal.setDst(ordaIp);
             journal.setDpt(ordaPort);
             journal.setDuser(ordaUser);
+            journal.setApp("https");
 
             String msg;
             if (error == null) {
@@ -98,11 +114,33 @@ public class SvoiCustomLogger {
         }
     }
 
+    public void logAuth(String ip, String username) {
+        try {
+            SvoiJournal journal = svoiJournalFactory.getJournalSource();
+            journal.setSrc(ip);
+            journal.setShost(ip);
+            journal.setSuser(username);
+
+            String message = String.format(
+                    "Authenticated user=%s ip=%s",
+                    username != null ? username : "unknown",
+                    ip
+            );
+
+            send("authSuccess", "Invalid Login or Password", message,
+                    SvoiSeverityEnum.FIVE, journal);
+
+        } catch (Exception ex) {
+            log.error("Ошибка при логировании неверных учётных данных", ex);
+        }
+    }
+
     public void logBadCredentials(String ip, String username, String endpoint) {
         try {
             SvoiJournal journal = prepareJournalBase();
             journal.setSrc(ip);
             journal.setShost(ip);
+            journal.setSuser(username);
 
             String message = String.format(
                     "authFailed invalidCredentials user=%s endpoint=%s ip=%s",
@@ -184,11 +222,23 @@ public class SvoiCustomLogger {
         journal.setDeviceEventClassID(deviceEventClassID);
         journal.setName(name);
         journal.setMessage(message);
-        journal.setDuser(sysProperties.getUser());
-        journal.setSuser(sysProperties.getUser());
-        journal.setApp("");
+        if (journal.getDuser() == null) {
+            journal.setDuser(sysProperties.getUser());
+        }
+        if (journal.getSuser() == null) {
+            journal.setSuser(sysProperties.getUser());
+        }
+        if (journal.getApp() == null) {
+            journal.setApp("TCP");
+        }
         journal.setDmac(getMacAddress());
         journal.setSeverity(severity);
+        if (journal.getSpt() == null) {
+            journal.setSpt(sysProperties.getDpt());
+        }
+        if (journal.getDpt() == null) {
+            journal.setDpt(sysProperties.getDpt());
+        }
     }
 
     private record HostInfo(String name, String ip) {

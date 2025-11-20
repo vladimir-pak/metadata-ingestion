@@ -28,19 +28,19 @@ public class CacheController {
 
     @PostMapping("/start/postgres")
     public ResponseEntity<String> startPostgres(@RequestBody RequestBodyDto body, HttpServletRequest request) {
-        logger.logApiCall(request, "startIngestionPostgres");
+        logger.logApiCall(request, "startIngestionPostgres", body);
         return startInternal(schemasProperties.getPostgres(), body.getServiceName());
     }
 
     @PostMapping("/start/oracle")
     public ResponseEntity<String> startOracle(@RequestBody RequestBodyDto body, HttpServletRequest request) {
-        logger.logApiCall(request, "startIngestionOracle");
+        logger.logApiCall(request, "startIngestionOracle", body);
         return startInternal(schemasProperties.getOracle(), body.getServiceName());
     }
 
     @PostMapping("/start/mssql")
     public ResponseEntity<String> startMssql(@RequestBody RequestBodyDto body, HttpServletRequest request) {
-        logger.logApiCall(request, "startIngestionMssql");
+        logger.logApiCall(request, "startIngestionMssql", body);
         return startInternal(schemasProperties.getMssql(), body.getServiceName());
     }
 
