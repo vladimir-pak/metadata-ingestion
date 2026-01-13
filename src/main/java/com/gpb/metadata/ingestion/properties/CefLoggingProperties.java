@@ -10,6 +10,6 @@ import org.springframework.stereotype.Component;
 @Component
 @ConfigurationProperties(prefix = "logging.cef")
 public class CefLoggingProperties {
-    private String path = "logs/cef";
+    private String path = "logs/cef.log";
     private int retentionDays = 30;
 }

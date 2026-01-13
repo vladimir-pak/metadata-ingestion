@@ -14,6 +14,8 @@ import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 import org.springframework.web.reactive.function.client.WebClient;
 
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.gpb.metadata.ingestion.cache.CacheComparisonResult;
 import com.gpb.metadata.ingestion.dto.mapper.MapperDto;
 import com.gpb.metadata.ingestion.enums.DbObjectType;
@@ -46,6 +48,7 @@ public class MetadataHandlerServiceImpl implements MetadataHandlerService {
     private final KeycloakConfig keycloakConfig;
 
     private final KeycloakAuthService keycloakAuthService;
+    private final ObjectMapper objectMapper = new ObjectMapper();
     private String token;
 
     @Value("${ord.api.max-connections:5}")
@@ -179,15 +182,15 @@ public class MetadataHandlerServiceImpl implements MetadataHandlerService {
     private void tablePutRequest(Collection<TableMetadata> meta, String endpoint, ServiceType serviceType) {
         Flux.fromIterable(meta)
                 .flatMap(value ->
-                                putRequest(endpoint, mapperDto.getDto(DbObjectType.TABLE, value, serviceType), Void.class)
-                                        .doOnSuccess(response ->
-                                                log.info("Успешно создано/обновлено {}: {}", DbObjectType.TABLE.name().toLowerCase(), value.getFqn())
-                                        )
-                                        .doOnError(error ->
-                                                log.error("Ошибка при создании/обновлении {}: {}", value.getFqn(), error.getMessage())
-                                        )
-                                        .onErrorResume(error -> Mono.empty()),
-                        maxConn
+                    putRequest(endpoint, mapperDto.getDto(DbObjectType.TABLE, value, serviceType), Void.class)
+                        .doOnSuccess(response ->
+                            log.info("Успешно создано/обновлено {}: {}", DbObjectType.TABLE.name().toLowerCase(), value.getFqn())
+                        )
+                        .doOnError(error ->
+                            log.error("Ошибка при создании/обновлении {}: {}", value.getFqn(), error.getMessage())
+                        )
+                        .onErrorResume(error -> Mono.empty()),
+                    maxConn
                 )
                 .then()
                 .block();
@@ -195,19 +198,23 @@ public class MetadataHandlerServiceImpl implements MetadataHandlerService {
 
     private void tableDeleteRequest(Collection<TableMetadata> meta, String endpoint) {
         Flux.fromIterable(meta)
-                .flatMap(value -> 
-                    deleteRequest(String.format("%s/%s", endpoint, value.getFqn()))
-                        .doOnSuccess(response -> 
-                            log.info("Успешно удалено {}", value.getFqn())
-                        )
-                        .doOnError(error -> 
-                            log.error("Ошибка при удалении {}: {}", value.getFqn(), error.getMessage())
-                        )
-                        .onErrorResume(error -> Mono.empty()),
-                    maxConn
-                )
-                .then() // Преобразуем в Mono<Void>
-                .block(); // Ждем завершения всех
+            .filterWhen(value ->
+                getIsProjectEntity(String.format("%s/%s", endpoint, value.getFqn()))
+                    .doOnNext(flag -> {
+                        if (!flag) {
+                            log.info("Пропуск удаления {} (isProjectEntity!=true)", value.getFqn());
+                        }
+                    })
+                    .onErrorReturn(false) // если GET упал — не удаляем
+            )
+            .flatMap(value ->
+                deleteRequest(String.format("%s/%s", endpoint, value.getFqn()))
+                    .doOnSuccess(v -> log.info("Успешно удалено {}", value.getFqn()))
+                    .doOnError(e -> log.error("Ошибка при удалении {}: {}", value.getFqn(), e.getMessage()))
+                    .onErrorResume(e -> Mono.empty())
+            , maxConn)
+            .then()
+            .block();
     }
 
     private <T> Mono<T> putRequest(String endpoint, Object requestBody, Class<T> responseType) {
@@ -306,6 +313,51 @@ public class MetadataHandlerServiceImpl implements MetadataHandlerService {
 
                     return Mono.empty();
                 });
+    }
+
+    private Mono<Boolean> getIsProjectEntity(String endpoint) {
+        OrdaHost orda = parseOrdaHost();
+        long start = System.currentTimeMillis();
+        String username = keycloakConfig.getUsername();
+
+        return webClient.get()
+            .uri(uriBuilder -> uriBuilder.path(endpoint).build())
+            .header(HttpHeaders.AUTHORIZATION, "Bearer " + token)
+            .exchangeToMono(response -> {
+                long duration = System.currentTimeMillis() - start;
+
+                return response.bodyToMono(String.class)
+                    .defaultIfEmpty("")
+                    .flatMap(body -> {
+                        if (response.statusCode().isError()) {
+                            svoiCustomLogger.logOrdaRequest(
+                                endpoint, "GET", response.statusCode().value(), duration,
+                                body, orda.dns(), orda.ip(), orda.port(), username
+                            );
+                            return Mono.error(new RuntimeException(body));
+                        }
+
+                        // лог успешного GET
+                        svoiCustomLogger.logOrdaRequest(
+                            endpoint, "GET", response.statusCode().value(), duration,
+                            null, orda.dns(), orda.ip(), orda.port(), username
+                        );
+
+                        try {
+                            JsonNode node = objectMapper.readTree(body);
+
+                            // isProjectEntity — String в корне
+                            String raw = node.path("isProjectEntity").asText(null);
+
+                            // если поля нет/пусто -> false (не удаляем)
+                            boolean flag = raw != null && Boolean.parseBoolean(raw.trim());
+
+                            return Mono.just(flag);
+                        } catch (Exception e) {
+                            return Mono.error(e);
+                        }
+                    });
+            });
     }
 
     private record OrdaHost(String dns, String ip, int port) {}

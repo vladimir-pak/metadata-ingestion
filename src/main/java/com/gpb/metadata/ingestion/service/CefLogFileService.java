@@ -31,7 +31,7 @@ public class CefLogFileService {
 
     public Path getArchLogPath() {
         String date = LocalDate.now(ZONE).minusDays(1).format(FILE_DATE);
-        return Paths.get(properties.getPath() + ".log." + date);
+        return Paths.get(properties.getPath() + "." + date);
     }
 
     public void writeToFile(LocalDateTime created, String cefLog) {
