@@ -200,12 +200,13 @@ public class MetadataHandlerServiceImpl implements MetadataHandlerService {
         Flux.fromIterable(meta)
             .filterWhen(value ->
                 getIsProjectEntity(String.format("%s/%s", endpoint, value.getFqn()))
-                    .doOnNext(flag -> {
-                        if (flag) {
+                    .map(flag -> !flag) // ВАЖНО: true -> НЕ удаляем
+                    .doOnNext(shouldDelete -> {
+                        if (!shouldDelete) {
                             log.info("Пропуск удаления {} (isProjectEntity=true)", value.getFqn());
                         }
                     })
-                    .onErrorReturn(false) // если GET упал — не удаляем
+                    .onErrorReturn(false) // если GET упал — НЕ удалять
             )
             .flatMap(value ->
                 deleteRequest(String.format("%s/%s", endpoint, value.getFqn()))
