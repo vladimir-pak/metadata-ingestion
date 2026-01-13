@@ -201,8 +201,8 @@ public class MetadataHandlerServiceImpl implements MetadataHandlerService {
             .filterWhen(value ->
                 getIsProjectEntity(String.format("%s/%s", endpoint, value.getFqn()))
                     .doOnNext(flag -> {
-                        if (!flag) {
-                            log.info("Пропуск удаления {} (isProjectEntity!=true)", value.getFqn());
+                        if (flag) {
+                            log.info("Пропуск удаления {} (isProjectEntity=true)", value.getFqn());
                         }
                     })
                     .onErrorReturn(false) // если GET упал — не удаляем
