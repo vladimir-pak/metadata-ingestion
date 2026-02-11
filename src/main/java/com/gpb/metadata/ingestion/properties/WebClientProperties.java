@@ -21,6 +21,7 @@ public class WebClientProperties {
         private String database = "/databases";
         private String schema = "/databaseSchemas";
         private String table = "/tables";
+        private String dbService = "/databaseServices";
     }
     
     // Методы для конкретных endpoints (возвращают только путь)
@@ -46,5 +47,9 @@ public class WebClientProperties {
 
     public String getTableDeleteEndpoint() {
         return endpoints.table + "/name";
+    }
+
+    public String getDatabaseServiceEndpoint() {
+        return endpoints.dbService;
     }
 }

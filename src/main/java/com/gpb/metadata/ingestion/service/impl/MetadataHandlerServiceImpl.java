@@ -10,6 +10,7 @@ import com.gpb.metadata.ingestion.log.SvoiCustomLogger;
 import com.gpb.metadata.ingestion.properties.MetadataSchemasProperties;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpHeaders;
+import org.springframework.lang.NonNull;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 import org.springframework.web.reactive.function.client.WebClient;
@@ -17,6 +18,7 @@ import org.springframework.web.reactive.function.client.WebClient;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.gpb.metadata.ingestion.cache.CacheComparisonResult;
+import com.gpb.metadata.ingestion.dto.DatabaseServiceMetadataDto;
 import com.gpb.metadata.ingestion.dto.mapper.MapperDto;
 import com.gpb.metadata.ingestion.enums.DbObjectType;
 import com.gpb.metadata.ingestion.model.postgres.DatabaseMetadata;
@@ -79,6 +81,22 @@ public class MetadataHandlerServiceImpl implements MetadataHandlerService {
             tableCacheService.synchronizeWithDatabase(schemaName, serviceName);
 
         token = keycloakAuthService.getValidAccessToken();
+
+        /**
+         * Проверяем наличие DatabaseService в ОРДе
+         * Если сервиса нет, то создаем
+         */
+        if (!checkEntityExists(
+                webClientProperties.getDatabaseServiceEndpoint() + "/name" + serviceName)
+            ) {
+            String dbServiceUrl = webClientProperties.getDatabaseServiceEndpoint();
+            DatabaseServiceMetadataDto dbServiceDto = DatabaseServiceMetadataDto.builder()
+                    .name(serviceName)
+                    .displayName(serviceName)
+                    .serviceType(type.getValue())
+                    .build();
+            putRequest(dbServiceUrl, dbServiceDto, Void.class);
+        }
         
         /*
          * Добавляем сущности в порядке очередности:
@@ -218,7 +236,7 @@ public class MetadataHandlerServiceImpl implements MetadataHandlerService {
             .block();
     }
 
-    private <T> Mono<T> putRequest(String endpoint, Object requestBody, Class<T> responseType) {
+    private <T> Mono<T> putRequest(@NonNull String endpoint, @NonNull Object requestBody, @NonNull Class<T> responseType) {
         OrdaHost orda = parseOrdaHost();
         long start = System.currentTimeMillis();
         String username = keycloakConfig.getUsername();
@@ -266,7 +284,7 @@ public class MetadataHandlerServiceImpl implements MetadataHandlerService {
                 });
     }
 
-    private Mono<Void> deleteRequest(String endpoint) {
+    private Mono<Void> deleteRequest(@NonNull String endpoint) {
 
         OrdaHost orda = parseOrdaHost();
         long start = System.currentTimeMillis();
@@ -316,7 +334,48 @@ public class MetadataHandlerServiceImpl implements MetadataHandlerService {
                 });
     }
 
-    private Mono<Boolean> getIsProjectEntity(String endpoint) {
+    private boolean checkEntityExists(@NonNull String endpoint) {
+        OrdaHost orda = parseOrdaHost();
+        long start = System.currentTimeMillis();
+        String username = keycloakConfig.getUsername();
+
+        try {
+            Mono<Boolean> mono = webClient.get()
+            .uri(uriBuilder -> uriBuilder.path(endpoint).build())
+            .header(HttpHeaders.AUTHORIZATION, "Bearer " + token)
+            .exchangeToMono(response -> {
+                long duration = System.currentTimeMillis() - start;
+
+                return response.bodyToMono(String.class)
+                    .defaultIfEmpty("")
+                    .flatMap(body -> {
+                        if (response.statusCode().isError()) {
+                            svoiCustomLogger.logOrdaRequest(
+                                endpoint, "GET", response.statusCode().value(), duration,
+                                body, orda.dns(), orda.ip(), orda.port(), username
+                            );
+                            return Mono.error(new RuntimeException(body));
+                        }
+
+                        // лог успешного GET
+                        svoiCustomLogger.logOrdaRequest(
+                            endpoint, "GET", response.statusCode().value(), duration,
+                            null, orda.dns(), orda.ip(), orda.port(), username
+                        );
+
+                        if (response.statusCode().is2xxSuccessful()) {
+                            return Mono.just(true);
+                        }
+                        return Mono.just(false);
+                    });
+            });
+            return mono.block();
+        } catch (RuntimeException ex) {
+            throw ex;
+        }
+    }
+
+    private Mono<Boolean> getIsProjectEntity(@NonNull String endpoint) {
         OrdaHost orda = parseOrdaHost();
         long start = System.currentTimeMillis();
         String username = keycloakConfig.getUsername();
