@@ -29,6 +29,9 @@ public class IgniteConfig {
     @Value("${ignite.persistence.walArchivePath:/ignite-storage/wal-archive}")
     private String persistenceWalArchivePath;
 
+    @Value("${ignite.persistence.workDir:/ignite/work}")
+    private String workDir;
+
     @Bean(name = "igniteInstance", destroyMethod = "close")
     public Ignite igniteInstance() {
         IgniteConfiguration cfg = new IgniteConfiguration();
@@ -37,6 +40,7 @@ public class IgniteConfig {
         cfg.setIgniteInstanceName("metadata-ingestion-cache");
         cfg.setPeerClassLoadingEnabled(true);
         cfg.setClientMode(false);
+        cfg.setWorkDirectory(workDir);
 
         // Конфигурация хранилища
         DataStorageConfiguration storageCfg = new DataStorageConfiguration();
