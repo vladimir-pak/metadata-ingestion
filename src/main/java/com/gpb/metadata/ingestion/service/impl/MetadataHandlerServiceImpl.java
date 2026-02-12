@@ -87,7 +87,7 @@ public class MetadataHandlerServiceImpl implements MetadataHandlerService {
          * Если сервиса нет, то создаем
          */
         if (!checkEntityExists(
-                webClientProperties.getDatabaseServiceEndpoint() + "/name" + serviceName)
+                webClientProperties.getDatabaseServiceEndpoint() + "/name/" + serviceName)
             ) {
             String dbServiceUrl = webClientProperties.getDatabaseServiceEndpoint();
             DatabaseServiceMetadataDto dbServiceDto = DatabaseServiceMetadataDto.builder()
