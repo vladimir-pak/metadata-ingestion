@@ -39,12 +39,11 @@ public abstract class AbstractMetadataCacheService<T extends Metadata> {
      */
     protected IgniteCache<EntityId, T> getOrCreateRuntimeCache(String schemaName, String serviceName) {
         String cacheKey = schemaName + "_" + serviceName;
+        String cacheName = String.format(CACHE_NAME, dbObjectTypeType.name()) + cacheKey;
 
-        return runtimeCaches.computeIfAbsent(cacheKey, key -> {
-            String cacheName = String.format(CACHE_NAME, dbObjectTypeType.name()) + cacheKey;
-
+        return runtimeCaches.computeIfAbsent(cacheName, name -> {
             CacheConfiguration<EntityId, T> cacheCfg = new CacheConfiguration<>();
-            cacheCfg.setName(cacheName);
+            cacheCfg.setName(name);
             cacheCfg.setCacheMode(CacheMode.REPLICATED);
             cacheCfg.setIndexedTypes(EntityId.class, getMetadataClass());
 
@@ -198,9 +197,12 @@ public abstract class AbstractMetadataCacheService<T extends Metadata> {
      */
     public void destroyRuntimeCache(String schemaName, String serviceName) {
         String cacheKey = schemaName + "_" + serviceName;
-        IgniteCache<EntityId, T> cache = runtimeCaches.remove(cacheKey);
-        if (cache != null) {
-            cache.destroy();
+        String cacheName = String.format(CACHE_NAME, dbObjectTypeType.name()) + cacheKey;
+
+        runtimeCaches.remove(cacheName);
+
+        if (ignite.cache(cacheName) != null) {  // проверка существования
+            ignite.destroyCache(cacheName);
         }
     }
 
@@ -208,12 +210,15 @@ public abstract class AbstractMetadataCacheService<T extends Metadata> {
      * Получить все runtime кэши
      */
     public Set<String> getAllRuntimeCaches() {
-        return new HashSet<>(runtimeCaches.keySet());
+        return new HashSet<>(runtimeCaches.keySet()); // ключи уже cacheName
     }
+
+    public IgniteCache<EntityId, T> getRuntimeCache(String schemaName, String serviceName) {
+        return getOrCreateRuntimeCache(schemaName, serviceName);
+    };
 
     /**
      * Абстрактный метод для получения класса метаданных
      */
     protected abstract Class<T> getMetadataClass();
 }
-

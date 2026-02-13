@@ -86,6 +86,12 @@
 			<version>1.4.197</version>
 		</dependency>
 
+		<dependency>
+            <groupId>com.github.jsqlparser</groupId>
+            <artifactId>jsqlparser</artifactId>
+            <version>4.9</version>
+        </dependency>
+
 
 		<!-- JSON Processing (для работы с JsonNode) -->
 		<dependency>

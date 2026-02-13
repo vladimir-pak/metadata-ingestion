@@ -21,7 +21,8 @@ public class WebClientProperties {
         private String database = "/databases";
         private String schema = "/databaseSchemas";
         private String table = "/tables";
-        private String dbService = "/databaseServices";
+        private String dbService = "/services/databaseServices";
+        private String lineage = "/lineage";
     }
     
     // Методы для конкретных endpoints (возвращают только путь)
@@ -51,5 +52,9 @@ public class WebClientProperties {
 
     public String getDatabaseServiceEndpoint() {
         return endpoints.dbService;
+    }
+
+    public String getLineageEndpoint() {
+        return endpoints.lineage;
     }
 }

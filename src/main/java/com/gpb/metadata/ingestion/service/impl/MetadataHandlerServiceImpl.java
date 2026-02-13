@@ -1,32 +1,28 @@
 package com.gpb.metadata.ingestion.service.impl;
 
-import java.net.InetAddress;
-import java.net.URI;
 import java.util.*;
+import java.util.stream.Collectors;
 
-import com.gpb.metadata.ingestion.config.KeycloakConfig;
 import com.gpb.metadata.ingestion.enums.ServiceType;
-import com.gpb.metadata.ingestion.log.SvoiCustomLogger;
+import com.gpb.metadata.ingestion.exceptions.OrdaNotFoundException;
 import com.gpb.metadata.ingestion.properties.MetadataSchemasProperties;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.http.HttpHeaders;
-import org.springframework.lang.NonNull;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
-import org.springframework.web.reactive.function.client.WebClient;
-
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.gpb.metadata.ingestion.cache.CacheComparisonResult;
 import com.gpb.metadata.ingestion.dto.DatabaseServiceMetadataDto;
+import com.gpb.metadata.ingestion.dto.lineage.AddLineageRequest;
 import com.gpb.metadata.ingestion.dto.mapper.MapperDto;
 import com.gpb.metadata.ingestion.enums.DbObjectType;
 import com.gpb.metadata.ingestion.model.postgres.DatabaseMetadata;
 import com.gpb.metadata.ingestion.model.postgres.SchemaMetadata;
 import com.gpb.metadata.ingestion.model.postgres.TableMetadata;
+import com.gpb.metadata.ingestion.model.schema.TableData;
 import com.gpb.metadata.ingestion.properties.WebClientProperties;
 import com.gpb.metadata.ingestion.service.KeycloakAuthService;
 import com.gpb.metadata.ingestion.service.MetadataHandlerService;
+import com.gpb.metadata.ingestion.utils.OrdaClient;
+import com.gpb.metadata.ingestion.utils.ViewLineageRequestBuilder;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -42,16 +38,14 @@ public class MetadataHandlerServiceImpl implements MetadataHandlerService {
     private final SchemaMetadataCacheServiceImpl schemaCacheService;
     private final TableMetadataCacheServiceImpl tableCacheService;
     private final MapperDto mapperDto;
-    private final SvoiCustomLogger svoiCustomLogger;
+    // Парсер и сборщик Lineage для View
+    private final ViewLineageRequestBuilder viewRequestBuilder;
 
-    private final WebClient webClient;
     private final WebClientProperties webClientProperties;
     private final MetadataSchemasProperties schemasProperties;
-    private final KeycloakConfig keycloakConfig;
 
     private final KeycloakAuthService keycloakAuthService;
-    private final ObjectMapper objectMapper = new ObjectMapper();
-    private String token;
+    private final OrdaClient ordaClient;
 
     @Value("${ord.api.max-connections:5}")
     private Integer maxConn;
@@ -80,22 +74,29 @@ public class MetadataHandlerServiceImpl implements MetadataHandlerService {
         CacheComparisonResult<TableMetadata> cacheTable = 
             tableCacheService.synchronizeWithDatabase(schemaName, serviceName);
 
-        token = keycloakAuthService.getValidAccessToken();
-
         /**
          * Проверяем наличие DatabaseService в ОРДе
          * Если сервиса нет, то создаем
          */
-        if (!checkEntityExists(
-                webClientProperties.getDatabaseServiceEndpoint() + "/name/" + serviceName)
-            ) {
+        String token = keycloakAuthService.getValidAccessToken();
+        if (token == null) {
+            log.error("ORD access_token is not resolved");
+            return;
+        }
+        boolean isExists = ordaClient.checkEntityExists(
+                (webClientProperties.getDatabaseServiceEndpoint() + "/name/" + serviceName),
+                token);
+        if (!isExists) {
+            log.info("Creating databaseService: {}", serviceName);
             String dbServiceUrl = webClientProperties.getDatabaseServiceEndpoint();
             DatabaseServiceMetadataDto dbServiceDto = DatabaseServiceMetadataDto.builder()
                     .name(serviceName)
                     .displayName(serviceName)
-                    .serviceType(type.getValue())
+                    .serviceType(
+                        type.getValue().substring(0, 1).toUpperCase() + 
+                                type.getValue().substring(1))
                     .build();
-            putRequest(dbServiceUrl, dbServiceDto, Void.class);
+            ordaClient.putRequest(dbServiceUrl, dbServiceDto, token, Void.class);
         }
         
         /*
@@ -113,6 +114,15 @@ public class MetadataHandlerServiceImpl implements MetadataHandlerService {
         Collection<TableMetadata> putTables = cacheTable.getPutRecords().values();
         tablePutRequest(putTables, webClientProperties.getTableEndpoint(), type);
 
+        Collection<TableMetadata> viewTables = putTables.stream()
+            .filter(table -> {
+                TableData tableData = table.getTableData();
+                return tableData != null && "VIEW".equals(tableData.getTableType());
+            })
+            .collect(Collectors.toList());
+
+        viewLineageRequest(viewTables, webClientProperties.getLineageEndpoint(), schemaName);
+        
         /*
          * Удаляем сущности в порядке очередности:
          * 1. Таблицы
@@ -130,9 +140,18 @@ public class MetadataHandlerServiceImpl implements MetadataHandlerService {
     }
 
     private void databasePutRequest(Collection<DatabaseMetadata> meta, String endpoint) {
+        String token = keycloakAuthService.getValidAccessToken();
+        if (token == null) {
+            log.error("ORD access_token is not resolved");
+            return;
+        }
         Flux.fromIterable(meta)
                 .flatMap(value -> 
-                    putRequest(endpoint, mapperDto.getDto(DbObjectType.DATABASE, value, null), Void.class)
+                    ordaClient.putRequest(
+                            endpoint, 
+                            mapperDto.getDto(DbObjectType.DATABASE, value, null), 
+                            token,
+                            Void.class)
                         .doOnSuccess(response -> 
                             log.info("Успешно создано/обновлено {}: {}", DbObjectType.DATABASE.name().toLowerCase(), value.getFqn())
                         )
@@ -147,9 +166,16 @@ public class MetadataHandlerServiceImpl implements MetadataHandlerService {
     }
 
     private void databaseDeleteRequest(Collection<DatabaseMetadata> meta, String endpoint) {
+        String token = keycloakAuthService.getValidAccessToken();
+        if (token == null) {
+            log.error("ORD access_token is not resolved");
+            return;
+        }
         Flux.fromIterable(meta)
                 .flatMap(value -> 
-                    deleteRequest(String.format("%s/%s", endpoint, value.getFqn()))
+                    ordaClient.deleteRequest(
+                            String.format("%s/%s", endpoint, value.getFqn()),
+                            token)
                         .doOnSuccess(response -> 
                             log.info("Успешно удалено {}", value.getFqn())
                         )
@@ -164,9 +190,18 @@ public class MetadataHandlerServiceImpl implements MetadataHandlerService {
     }
 
     private void schemaPutRequest(Collection<SchemaMetadata> meta, String endpoint) {
+        String token = keycloakAuthService.getValidAccessToken();
+        if (token == null) {
+            log.error("ORD access_token is not resolved");
+            return;
+        }
         Flux.fromIterable(meta)
                 .flatMap(value -> 
-                    putRequest(endpoint, mapperDto.getDto(DbObjectType.SCHEMA, value, null), Void.class)
+                    ordaClient.putRequest(
+                            endpoint, 
+                            mapperDto.getDto(DbObjectType.SCHEMA, value, null), 
+                            token,
+                            Void.class)
                         .doOnSuccess(response -> 
                             log.info("Успешно создано/обновлено {}: {}", DbObjectType.SCHEMA.name().toLowerCase(), value.getFqn())
                         )
@@ -181,9 +216,16 @@ public class MetadataHandlerServiceImpl implements MetadataHandlerService {
     }
 
     private void schemaDeleteRequest(Collection<SchemaMetadata> meta, String endpoint) {
+        String token = keycloakAuthService.getValidAccessToken();
+        if (token == null) {
+            log.error("ORD access_token is not resolved");
+            return;
+        }
         Flux.fromIterable(meta)
                 .flatMap(value -> 
-                    deleteRequest(String.format("%s/%s", endpoint, value.getFqn()))
+                    ordaClient.deleteRequest(
+                            String.format("%s/%s", endpoint, value.getFqn()),
+                            token)
                         .doOnSuccess(response -> 
                             log.info("Успешно удалено {}", value.getFqn())
                         )
@@ -198,239 +240,129 @@ public class MetadataHandlerServiceImpl implements MetadataHandlerService {
     }
 
     private void tablePutRequest(Collection<TableMetadata> meta, String endpoint, ServiceType serviceType) {
+        String token = keycloakAuthService.getValidAccessToken();
+        if (token == null) {
+            log.error("ORD access_token is not resolved");
+            return;
+        }
         Flux.fromIterable(meta)
-                .flatMap(value ->
-                    putRequest(endpoint, mapperDto.getDto(DbObjectType.TABLE, value, serviceType), Void.class)
-                        .doOnSuccess(response ->
-                            log.info("Успешно создано/обновлено {}: {}", DbObjectType.TABLE.name().toLowerCase(), value.getFqn())
-                        )
-                        .doOnError(error ->
-                            log.error("Ошибка при создании/обновлении {}: {}", value.getFqn(), error.getMessage())
-                        )
-                        .onErrorResume(error -> Mono.empty()),
-                    maxConn
-                )
-                .then()
-                .block();
+            .flatMap(value -> {
+                String url = String.format("%s/name/%s", endpoint, value.getFqn());
+
+                Mono<Boolean> shouldPutMono = ordaClient.getIsProjectEntity(url, token)
+                    .map(isProject -> {
+                        if (isProject) {
+                            log.info("Пропуск проектной сущности {} (isProjectEntity=true)", value.getFqn());
+                            return false; // PUT НЕ надо
+                        }
+                        return true; // isProjectEntity=false => PUT надо
+                    })
+                    .onErrorResume(OrdaNotFoundException.class, e -> {
+                        // 404 => PUT надо
+                        log.info("Сущность не найдена (404) {}, отправляем PUT", value.getFqn());
+                        return Mono.just(true);
+                    })
+                    .onErrorResume(e -> {
+                        // прочие ошибки => PUT НЕ надо
+                        log.error("GET isProjectEntity ошибка для {}, PUT пропущен: {}", value.getFqn(), e.getMessage());
+                        return Mono.just(false);
+                    });
+
+                return shouldPutMono.flatMap(shouldPut -> {
+                    if (!shouldPut) return Mono.empty();
+
+                    return ordaClient.putRequest(
+                            endpoint, 
+                            mapperDto.getDto(DbObjectType.TABLE, value, serviceType),
+                            token,
+                            Void.class)
+                        .doOnSuccess(r -> log.info("Успешно создано/обновлено table: {}", value.getFqn()))
+                        .doOnError(e -> log.error("Ошибка PUT {}: {}", value.getFqn(), e.getMessage()))
+                        .onErrorResume(e -> Mono.empty());
+                });
+            }, maxConn)
+            .then()
+            .block();
     }
 
     private void tableDeleteRequest(Collection<TableMetadata> meta, String endpoint) {
+        String token = keycloakAuthService.getValidAccessToken();
+        if (token == null) {
+            log.error("ORD access_token is not resolved");
+            return;
+        }
         Flux.fromIterable(meta)
             .filterWhen(value ->
-                getIsProjectEntity(String.format("%s/%s", endpoint, value.getFqn()))
-                    .map(flag -> !flag) // ВАЖНО: true -> НЕ удаляем
+                ordaClient.getIsProjectEntity(
+                        String.format("%s/%s", endpoint, value.getFqn()),
+                        token)
+                    .map(isProject -> !isProject) // true => удаляем только если НЕ проектная
                     .doOnNext(shouldDelete -> {
                         if (!shouldDelete) {
                             log.info("Пропуск удаления {} (isProjectEntity=true)", value.getFqn());
                         }
                     })
-                    .onErrorReturn(false) // если GET упал — НЕ удалять
+                    .onErrorResume(e -> {
+                        // 404 и любые ошибки => НЕ удаляем
+                        if (e instanceof OrdaNotFoundException) {
+                            log.info("Не найдено (404), удаление пропускаем: {}", value.getFqn());
+                        } else {
+                            log.error("GET isProjectEntity ошибка, удаление пропускаем {}: {}", value.getFqn(), e.getMessage());
+                        }
+                        return Mono.just(false);
+                    })
             )
             .flatMap(value ->
-                deleteRequest(String.format("%s/%s", endpoint, value.getFqn()))
+                ordaClient.deleteRequest(
+                        String.format("%s/%s", endpoint, value.getFqn()),
+                        token)
                     .doOnSuccess(v -> log.info("Успешно удалено {}", value.getFqn()))
                     .doOnError(e -> log.error("Ошибка при удалении {}: {}", value.getFqn(), e.getMessage()))
-                    .onErrorResume(e -> Mono.empty())
-            , maxConn)
+                    .onErrorResume(e -> Mono.empty()),
+                maxConn
+            )
             .then()
             .block();
     }
 
-    private <T> Mono<T> putRequest(@NonNull String endpoint, @NonNull Object requestBody, @NonNull Class<T> responseType) {
-        OrdaHost orda = parseOrdaHost();
-        long start = System.currentTimeMillis();
-        String username = keycloakConfig.getUsername();
+    private void viewLineageRequest(Collection<TableMetadata> meta, String endpoint, String dbType) {
+        List<AddLineageRequest> requests = new ArrayList<>();
 
-        return webClient.put()
-                .uri(endpoint)
-                .header(HttpHeaders.AUTHORIZATION, "Bearer " + token)
-                .bodyValue(requestBody)
-                .exchangeToMono(response -> {
-
-                    long duration = System.currentTimeMillis() - start;
-
-                    if (response.statusCode().isError()) {
-
-                        return response.bodyToMono(String.class)
-                                .flatMap(err -> {
-                                    svoiCustomLogger.logOrdaRequest(
-                                            endpoint,
-                                            "PUT",
-                                            response.statusCode().value(),
-                                            duration,
-                                            err,
-                                            orda.dns(),
-                                            orda.ip(),
-                                            orda.port(),
-                                            username
-                                    );
-                                    return Mono.error(new RuntimeException(err));
-                                });
-                    }
-
-                    svoiCustomLogger.logOrdaRequest(
-                            endpoint,
-                            "PUT",
-                            response.statusCode().value(),
-                            duration,
-                            null,
-                            orda.dns(),
-                            orda.ip(),
-                            orda.port(),
-                            username
-                    );
-
-                    return response.bodyToMono(responseType);
-                });
-    }
-
-    private Mono<Void> deleteRequest(@NonNull String endpoint) {
-
-        OrdaHost orda = parseOrdaHost();
-        long start = System.currentTimeMillis();
-        String username = keycloakConfig.getUsername();
-
-        return webClient.delete()
-                .uri(uriBuilder -> uriBuilder
-                        .path(endpoint)
-                        .queryParam("recursive", "true")
-                        .build())
-                .header(HttpHeaders.AUTHORIZATION, "Bearer " + token)
-                .exchangeToMono(response -> {
-
-                    long duration = System.currentTimeMillis() - start;
-
-                    if (response.statusCode().isError()) {
-                        return response.bodyToMono(String.class)
-                                .flatMap(err -> {
-                                    svoiCustomLogger.logOrdaRequest(
-                                            endpoint,
-                                            "DELETE",
-                                            response.statusCode().value(),
-                                            duration,
-                                            err,
-                                            orda.dns(),
-                                            orda.ip(),
-                                            orda.port(),
-                                            username
-                                    );
-                                    return Mono.error(new RuntimeException(err));
-                                });
-                    }
-
-                    svoiCustomLogger.logOrdaRequest(
-                            endpoint,
-                            "DELETE",
-                            response.statusCode().value(),
-                            duration,
-                            null,
-                            orda.dns(),
-                            orda.ip(),
-                            orda.port(),
-                            username
-                    );
-
-                    return Mono.empty();
-                });
-    }
-
-    private boolean checkEntityExists(@NonNull String endpoint) {
-        OrdaHost orda = parseOrdaHost();
-        long start = System.currentTimeMillis();
-        String username = keycloakConfig.getUsername();
-
-        try {
-            Mono<Boolean> mono = webClient.get()
-            .uri(uriBuilder -> uriBuilder.path(endpoint).build())
-            .header(HttpHeaders.AUTHORIZATION, "Bearer " + token)
-            .exchangeToMono(response -> {
-                long duration = System.currentTimeMillis() - start;
-
-                return response.bodyToMono(String.class)
-                    .defaultIfEmpty("")
-                    .flatMap(body -> {
-                        if (response.statusCode().isError()) {
-                            svoiCustomLogger.logOrdaRequest(
-                                endpoint, "GET", response.statusCode().value(), duration,
-                                body, orda.dns(), orda.ip(), orda.port(), username
-                            );
-                            return Mono.error(new RuntimeException(body));
-                        }
-
-                        // лог успешного GET
-                        svoiCustomLogger.logOrdaRequest(
-                            endpoint, "GET", response.statusCode().value(), duration,
-                            null, orda.dns(), orda.ip(), orda.port(), username
-                        );
-
-                        if (response.statusCode().is2xxSuccessful()) {
-                            return Mono.just(true);
-                        }
-                        return Mono.just(false);
-                    });
-            });
-            return mono.block();
-        } catch (RuntimeException ex) {
-            throw ex;
+        for (TableMetadata view : meta) {
+            // Lineage request
+            try {
+                List<AddLineageRequest> viewRequests = viewRequestBuilder.buildEdgesForView(view, dbType);
+                requests.addAll(viewRequests);
+            } catch (RuntimeException e) {
+                log.error("Error while parsing viewDefinition: {}. {}", view.getFqn(), e.getMessage());
+                continue;
+            }            
         }
-    }
 
-    private Mono<Boolean> getIsProjectEntity(@NonNull String endpoint) {
-        OrdaHost orda = parseOrdaHost();
-        long start = System.currentTimeMillis();
-        String username = keycloakConfig.getUsername();
-
-        return webClient.get()
-            .uri(uriBuilder -> uriBuilder.path(endpoint).build())
-            .header(HttpHeaders.AUTHORIZATION, "Bearer " + token)
-            .exchangeToMono(response -> {
-                long duration = System.currentTimeMillis() - start;
-
-                return response.bodyToMono(String.class)
-                    .defaultIfEmpty("")
-                    .flatMap(body -> {
-                        if (response.statusCode().isError()) {
-                            svoiCustomLogger.logOrdaRequest(
-                                endpoint, "GET", response.statusCode().value(), duration,
-                                body, orda.dns(), orda.ip(), orda.port(), username
-                            );
-                            return Mono.error(new RuntimeException(body));
-                        }
-
-                        // лог успешного GET
-                        svoiCustomLogger.logOrdaRequest(
-                            endpoint, "GET", response.statusCode().value(), duration,
-                            null, orda.dns(), orda.ip(), orda.port(), username
-                        );
-
-                        try {
-                            JsonNode node = objectMapper.readTree(body);
-
-                            // isProjectEntity — String в корне
-                            String raw = node.path("isProjectEntity").asText(null);
-
-                            // если поля нет/пусто -> false (не удаляем)
-                            boolean flag = raw != null && Boolean.parseBoolean(raw.trim());
-
-                            return Mono.just(flag);
-                        } catch (Exception e) {
-                            return Mono.error(e);
-                        }
-                    });
-            });
-    }
-
-    private record OrdaHost(String dns, String ip, int port) {}
-
-    private OrdaHost parseOrdaHost() {
-        try {
-            URI uri = new URI(webClientProperties.getBaseUrl());
-            String dns = uri.getHost();
-            int port = uri.getPort() == -1 ? 443 : uri.getPort();
-            String ip = InetAddress.getByName(dns).getHostAddress();
-            return new OrdaHost(dns, ip, port);
-        } catch (Exception e) {
-            return new OrdaHost("unknown", "unknown", 443);
+        String token = keycloakAuthService.getValidAccessToken();
+        if (token == null) {
+            log.error("ORD access_token is not resolved");
+            return;
         }
+        Flux.fromIterable(requests)
+                .flatMap(value -> 
+                    ordaClient.putRequest(
+                            endpoint, 
+                            value, 
+                            token,
+                            Void.class)
+                        .doOnSuccess(response -> 
+                            log.info("Успешно создано/обновлено ViewLineage: {}", 
+                                    value.getEdge().getToEntity().getId())
+                        )
+                        .doOnError(error -> 
+                            log.error("Ошибка при создании/обновлении ViewLineage {}: {}", 
+                                    value.getEdge().getToEntity().getId(), error.getMessage())
+                        )
+                        .onErrorResume(error -> Mono.empty()),
+                    maxConn
+                )
+                .then() // Преобразуем в Mono<Void>
+                .block(); // Ждем завершения всех
     }
 }
