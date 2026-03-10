@@ -47,8 +47,20 @@ public class ViewLineageRequestBuilder {
             throw new RuntimeException("ORD access_token is not resolved");
         }
 
-        // viewFqn = service.db.schema.view  (parentFqn уже = service.db.schema)
-        String viewFqn = String.format("%s.%s", viewDTO.getParentFqn(), normalizeIdent(viewDTO.getName()));
+        String dbName = viewDTO.getDbName();
+        String schemaName = viewDTO.getSchemaName();
+        if (dbName.contains(".")) {
+            dbName = String.format("\"%s\"", dbName);
+        }
+        if (schemaName.contains(".")) {
+            schemaName = String.format("\"%s\"", schemaName);
+        }
+        String viewFqn = String.format("%s.%s.%s.%s", 
+            viewDTO.getServiceName(), 
+            dbName,
+            schemaName,
+            normalizeIdent(viewDTO.getName())
+        );
 
         String viewId = resolveTableIdCached(viewFqn, token).orElse(null);
         if (viewId == null) {
@@ -236,11 +248,19 @@ public class ViewLineageRequestBuilder {
 
         if (tableName == null || tableName.isBlank()) return null;
 
+        String dbName = viewDTO.getDbName();
+        if (dbName.contains(".")) {
+            dbName = String.format("\"$s\"", dbName);
+        }
+        if (schema.contains(".")) {
+            schema = String.format("\"$s\"", schema);
+        }
+
         // если схема указана — service.db.<schema>.<table>
         if (schema != null && !schema.isBlank()) {
             String fqn = String.format("%s.%s.%s.%s",
                     viewDTO.getServiceName(),
-                    viewDTO.getDbName(),
+                    dbName,
                     schema,
                     tableName);
 

@@ -46,16 +46,26 @@ public class MapperDto {
     }
 
     public SchemaMetadataDto mapToSchemaDto(SchemaMetadata meta) {
-        return SchemaMetadataDto.builder()
+        SchemaMetadataDto dto = SchemaMetadataDto.builder()
                 .name(meta.getName())
                 .displayName(meta.getName())
                 .database(meta.getParentFqn())
                 .build();
+        if (meta.getDbName().contains(".")) {
+            String dbFqn = String.format("%s.\"%s\"", meta.getServiceName(), meta.getDbName());
+            dto.setDatabase(dbFqn);
+        }
+        return dto;
     }
 
     public TableMetadataDto mapToTableDto(TableMetadata meta, ServiceType serviceType) {
         TableData tableData = meta.getTableData();
         String processedTableType = TableTypes.map(tableData.getTableType());
+
+        if (tableData.getColumns() == null) {
+            log.error("Ошибка при обработке Table {}: columns is null", meta.getFqn());
+            return null;
+        }
 
         List<ColumnMetadataDto> columns = tableData.getColumns().stream()
                 .map(column -> {
@@ -98,7 +108,7 @@ public class MapperDto {
                 })
                 .collect(Collectors.toList());
 
-        return TableMetadataDto.builder()
+        TableMetadataDto dto = TableMetadataDto.builder()
                 .name(meta.getName())
                 .displayName(meta.getName())
                 .tableType(processedTableType)
@@ -109,6 +119,20 @@ public class MapperDto {
                 .columns(columns)
                 .tableConstraints(filteredConstraints)
                 .build();
+        
+        String dbName = meta.getDbName();
+        String schemaName = meta.getSchemaName();
+        if (meta.getDbName().contains(".")) {
+            dbName = String.format("\"%s\"", meta.getDbName());
+        }
+
+        if (meta.getSchemaName().contains(".")) {
+            schemaName = String.format("\"%s\"", meta.getSchemaName());
+        }
+        
+        dto.setDatabaseSchema(String.format("%s.%s.%s", meta.getServiceName(), dbName, schemaName));
+
+        return dto;
     }
 
     private String resolveArrayType(String sourceType, String processedType) {

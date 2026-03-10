@@ -96,7 +96,10 @@ public class MetadataHandlerServiceImpl implements MetadataHandlerService {
                         type.getValue().substring(0, 1).toUpperCase() + 
                                 type.getValue().substring(1))
                     .build();
-            ordaClient.putRequest(dbServiceUrl, dbServiceDto, token, Void.class);
+            log.info("DTO creating DB: name={}; serviceType={}", dbServiceDto.getName(), dbServiceDto.getServiceType());
+            Mono<String> resp = ordaClient.putRequest(dbServiceUrl, dbServiceDto, token, String.class);
+            String respString = resp.block();
+            log.info("Response for creating DB: {}", respString);
         }
         
         /*
@@ -106,13 +109,25 @@ public class MetadataHandlerServiceImpl implements MetadataHandlerService {
          * 3. Таблицы
          */
         Collection<DatabaseMetadata> putDatabases = cacheDatabase.getPutRecords().values();
-        databasePutRequest(putDatabases, webClientProperties.getDatabaseEndpoint());
+        int dbError = databasePutRequest(putDatabases, webClientProperties.getDatabaseEndpoint());
+        log.info("DbService \"{}\". Databases to PUT: {}. With errors: {}.",
+                serviceName,
+                putDatabases.size(),
+                dbError);
 
         Collection<SchemaMetadata> putSchemas = cacheSchema.getPutRecords().values();
-        schemaPutRequest(putSchemas, webClientProperties.getSchemaEndpoint());
+        int schemaError = schemaPutRequest(putSchemas, webClientProperties.getSchemaEndpoint());
+        log.info("DbService \"{}\". Schemas to PUT: {}. With errors: {}.",
+                serviceName,
+                putSchemas.size(),
+                schemaError);
 
         Collection<TableMetadata> putTables = cacheTable.getPutRecords().values();
-        tablePutRequest(putTables, webClientProperties.getTableEndpoint(), type);
+        int tableError = tablePutRequest(putTables, webClientProperties.getTableEndpoint(), type);
+        log.info("DbService \"{}\". Tables to PUT: {}. With errors: {}.",
+                serviceName,
+                putTables.size(),
+                tableError);
 
         Collection<TableMetadata> viewTables = putTables.stream()
             .filter(table -> {
@@ -130,48 +145,64 @@ public class MetadataHandlerServiceImpl implements MetadataHandlerService {
          * 3. БД
          */
         Collection<TableMetadata> toDeleteTable = cacheTable.getDeletedRecords().values();
-        tableDeleteRequest(toDeleteTable, webClientProperties.getTableDeleteEndpoint());
+        int tableErrorDel = tableDeleteRequest(toDeleteTable, webClientProperties.getTableDeleteEndpoint());
+        log.info("DbService \"{}\". Tables to DEL: {}. With errors: {}.",
+                serviceName,
+                toDeleteTable.size(),
+                tableErrorDel);
 
         Collection<SchemaMetadata> toDeleteSchema = cacheSchema.getDeletedRecords().values();
-        schemaDeleteRequest(toDeleteSchema, webClientProperties.getSchemaDeleteEndpoint());
+        int schemaErrorDel = schemaDeleteRequest(toDeleteSchema, webClientProperties.getSchemaDeleteEndpoint());
+        log.info("DbService \"{}\". Schemas to DEL: {}. With errors: {}.",
+                serviceName,
+                toDeleteSchema.size(),
+                schemaErrorDel);
 
         Collection<DatabaseMetadata> toDeleteDatabase = cacheDatabase.getDeletedRecords().values();
-        databaseDeleteRequest(toDeleteDatabase, webClientProperties.getDatabaseDeleteEndpoint());
+        int dbErrorDel = databaseDeleteRequest(toDeleteDatabase, webClientProperties.getDatabaseDeleteEndpoint());
+        log.info("DbService \"{}\". Databases to DEL: {}. With errors: {}.",
+                serviceName,
+                toDeleteDatabase.size(),
+                dbErrorDel);
     }
 
-    private void databasePutRequest(Collection<DatabaseMetadata> meta, String endpoint) {
+    private int databasePutRequest(Collection<DatabaseMetadata> meta, String endpoint) {
         String token = keycloakAuthService.getValidAccessToken();
         if (token == null) {
             log.error("ORD access_token is not resolved");
-            return;
+            return meta.size(); // считаем, что все упали
         }
-        Flux.fromIterable(meta)
-                .flatMap(value -> 
-                    ordaClient.putRequest(
-                            endpoint, 
-                            mapperDto.getDto(DbObjectType.DATABASE, value, null), 
-                            token,
-                            Void.class)
-                        .doOnSuccess(response -> 
-                            log.info("Успешно создано/обновлено {}: {}", DbObjectType.DATABASE.name().toLowerCase(), value.getFqn())
-                        )
-                        .doOnError(error -> 
-                            log.error("Ошибка при создании/обновлении {}: {}", value.getFqn(), error.getMessage())
-                        )
-                        .onErrorResume(error -> Mono.empty()),
-                    maxConn
+
+        return Flux.fromIterable(meta)
+                .flatMap(value ->
+                        ordaClient.putRequest(
+                                        endpoint,
+                                        mapperDto.getDto(DbObjectType.DATABASE, value, null),
+                                        token,
+                                        Void.class)
+                                .doOnSuccess(response ->
+                                        log.info("Успешно создано/обновлено {}: {}",
+                                                DbObjectType.DATABASE.name().toLowerCase(), value.getFqn())
+                                )
+                                .doOnError(error ->
+                                        log.error("Ошибка при создании/обновлении {}: {}",
+                                                value.getFqn(), error.getMessage())
+                                )
+                                .map(r -> 0)                // успех = 0 ошибок
+                                .onErrorReturn(1),         // ошибка = 1
+                        maxConn
                 )
-                .then() // Преобразуем в Mono<Void>
-                .block(); // Ждем завершения всех
+                .reduce(0, Integer::sum)   // суммируем все ошибки
+                .block();                  // ждем и получаем int
     }
 
-    private void databaseDeleteRequest(Collection<DatabaseMetadata> meta, String endpoint) {
+    private int databaseDeleteRequest(Collection<DatabaseMetadata> meta, String endpoint) {
         String token = keycloakAuthService.getValidAccessToken();
         if (token == null) {
             log.error("ORD access_token is not resolved");
-            return;
+            return meta.size();
         }
-        Flux.fromIterable(meta)
+        return Flux.fromIterable(meta)
                 .flatMap(value -> 
                     ordaClient.deleteRequest(
                             String.format("%s/%s", endpoint, value.getFqn()),
@@ -182,20 +213,23 @@ public class MetadataHandlerServiceImpl implements MetadataHandlerService {
                         .doOnError(error -> 
                             log.error("Ошибка при удалении {}: {}", value.getFqn(), error.getMessage())
                         )
-                        .onErrorResume(error -> Mono.empty()),
+                        // .onErrorResume(error -> Mono.empty()),
+                        .map(r -> 0)
+                        .onErrorReturn(1),
                     maxConn
                 )
-                .then() // Преобразуем в Mono<Void>
+                // .then() // Преобразуем в Mono<Void>
+                .reduce(0, Integer::sum)
                 .block(); // Ждем завершения всех
     }
 
-    private void schemaPutRequest(Collection<SchemaMetadata> meta, String endpoint) {
+    private int schemaPutRequest(Collection<SchemaMetadata> meta, String endpoint) {
         String token = keycloakAuthService.getValidAccessToken();
         if (token == null) {
             log.error("ORD access_token is not resolved");
-            return;
+            return meta.size();
         }
-        Flux.fromIterable(meta)
+        return Flux.fromIterable(meta)
                 .flatMap(value -> 
                     ordaClient.putRequest(
                             endpoint, 
@@ -208,20 +242,23 @@ public class MetadataHandlerServiceImpl implements MetadataHandlerService {
                         .doOnError(error -> 
                             log.error("Ошибка при создании/обновлении {}: {}", value.getFqn(), error.getMessage())
                         )
-                        .onErrorResume(error -> Mono.empty()),
+                        // .onErrorResume(error -> Mono.empty()),
+                        .map(r -> 0)
+                        .onErrorReturn(1),
                     maxConn
                 )
-                .then() // Преобразуем в Mono<Void>
+                // .then() // Преобразуем в Mono<Void>
+                .reduce(0, Integer::sum)
                 .block(); // Ждем завершения всех
     }
 
-    private void schemaDeleteRequest(Collection<SchemaMetadata> meta, String endpoint) {
+    private int schemaDeleteRequest(Collection<SchemaMetadata> meta, String endpoint) {
         String token = keycloakAuthService.getValidAccessToken();
         if (token == null) {
             log.error("ORD access_token is not resolved");
-            return;
+            return meta.size();
         }
-        Flux.fromIterable(meta)
+        return Flux.fromIterable(meta)
                 .flatMap(value -> 
                     ordaClient.deleteRequest(
                             String.format("%s/%s", endpoint, value.getFqn()),
@@ -232,20 +269,23 @@ public class MetadataHandlerServiceImpl implements MetadataHandlerService {
                         .doOnError(error -> 
                             log.error("Ошибка при удалении {}: {}", value.getFqn(), error.getMessage())
                         )
-                        .onErrorResume(error -> Mono.empty()),
+                        // .onErrorResume(error -> Mono.empty()),
+                        .map(r -> 0)
+                        .onErrorReturn(1),
                     maxConn
                 )
-                .then() // Преобразуем в Mono<Void>
+                // .then() // Преобразуем в Mono<Void>
+                .reduce(0, Integer::sum)
                 .block(); // Ждем завершения всех
     }
 
-    private void tablePutRequest(Collection<TableMetadata> meta, String endpoint, ServiceType serviceType) {
+    private int tablePutRequest(Collection<TableMetadata> meta, String endpoint, ServiceType serviceType) {
         String token = keycloakAuthService.getValidAccessToken();
         if (token == null) {
             log.error("ORD access_token is not resolved");
-            return;
+            return meta.size();
         }
-        Flux.fromIterable(meta)
+        return Flux.fromIterable(meta)
             .flatMap(value -> {
                 String url = String.format("%s/name/%s", endpoint, value.getFqn());
 
@@ -259,7 +299,6 @@ public class MetadataHandlerServiceImpl implements MetadataHandlerService {
                     })
                     .onErrorResume(OrdaNotFoundException.class, e -> {
                         // 404 => PUT надо
-                        log.info("Сущность не найдена (404) {}, отправляем PUT", value.getFqn());
                         return Mono.just(true);
                     })
                     .onErrorResume(e -> {
@@ -271,27 +310,35 @@ public class MetadataHandlerServiceImpl implements MetadataHandlerService {
                 return shouldPutMono.flatMap(shouldPut -> {
                     if (!shouldPut) return Mono.empty();
 
+                    Object body = mapperDto.getDto(DbObjectType.TABLE, value, serviceType);
+                    if (body == null) {
+                        return Mono.just(1);
+                    }
+
                     return ordaClient.putRequest(
                             endpoint, 
-                            mapperDto.getDto(DbObjectType.TABLE, value, serviceType),
+                            body,
                             token,
                             Void.class)
                         .doOnSuccess(r -> log.info("Успешно создано/обновлено table: {}", value.getFqn()))
                         .doOnError(e -> log.error("Ошибка PUT {}: {}", value.getFqn(), e.getMessage()))
-                        .onErrorResume(e -> Mono.empty());
+                        // .onErrorResume(e -> Mono.empty());
+                        .map(r -> 0)
+                        .onErrorReturn(1);
                 });
             }, maxConn)
-            .then()
+            // .then()
+            .reduce(0, Integer::sum)
             .block();
     }
 
-    private void tableDeleteRequest(Collection<TableMetadata> meta, String endpoint) {
+    private int tableDeleteRequest(Collection<TableMetadata> meta, String endpoint) {
         String token = keycloakAuthService.getValidAccessToken();
         if (token == null) {
             log.error("ORD access_token is not resolved");
-            return;
+            return meta.size();
         }
-        Flux.fromIterable(meta)
+        return Flux.fromIterable(meta)
             .filterWhen(value ->
                 ordaClient.getIsProjectEntity(
                         String.format("%s/%s", endpoint, value.getFqn()),
@@ -318,10 +365,13 @@ public class MetadataHandlerServiceImpl implements MetadataHandlerService {
                         token)
                     .doOnSuccess(v -> log.info("Успешно удалено {}", value.getFqn()))
                     .doOnError(e -> log.error("Ошибка при удалении {}: {}", value.getFqn(), e.getMessage()))
-                    .onErrorResume(e -> Mono.empty()),
+                    // .onErrorResume(e -> Mono.empty()),
+                    .map(r -> 0)
+                    .onErrorReturn(1),
                 maxConn
             )
-            .then()
+            // .then()
+            .reduce(0, Integer::sum)
             .block();
     }
 
