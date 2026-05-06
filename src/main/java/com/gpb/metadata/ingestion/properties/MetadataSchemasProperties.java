@@ -11,4 +11,5 @@ public class MetadataSchemasProperties {
     private String postgres;
     private String mssql;
     private String oracle;
+    private String sapiq;
 }

@@ -60,7 +60,8 @@ public class MetadataHandlerServiceImpl implements MetadataHandlerService {
         final Map<String, ServiceType> schemaTypeMap = Map.of(
                 schemasProperties.getPostgres(), ServiceType.POSTGRES,
                 schemasProperties.getMssql(), ServiceType.MSSQL,
-                schemasProperties.getOracle(), ServiceType.ORACLE
+                schemasProperties.getOracle(), ServiceType.ORACLE,
+                schemasProperties.getSapiq(), ServiceType.SAPIQ
         );
 
         ServiceType type = schemaTypeMap.get(schemaName);

@@ -3,7 +3,8 @@ package com.gpb.metadata.ingestion.enums;
 public enum ServiceType {
     POSTGRES("postgres"),
     MSSQL("mssql"),
-    ORACLE("oracle");
+    ORACLE("oracle"),
+    SAPIQ("sapiq");
 
     private final String value;
 

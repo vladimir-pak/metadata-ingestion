@@ -48,6 +48,12 @@ public class CacheController {
         return startInternal(schemasProperties.getMssql(), body.getServiceName());
     }
 
+    @PostMapping("/start/sapiq")
+    public ResponseEntity<String> startSapIq(@RequestBody RequestBodyDto body, HttpServletRequest request) {
+        logger.logApiCall(request, "startIngestionSapIq", body);
+        return startInternal(schemasProperties.getSapiq(), body.getServiceName());
+    }
+
     @DeleteMapping("/clean/{schema}")
     public ResponseEntity<String> cleanCache(
         @RequestBody RequestBodyDto body, 

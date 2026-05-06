@@ -132,3 +132,5 @@ metadata:
     postgres: postgres_metadata
     mssql: mssql_metadata
     oracle: oracle_metadata
+    sapiq: sapiq_metadata
+    

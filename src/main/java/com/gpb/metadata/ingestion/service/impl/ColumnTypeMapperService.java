@@ -12,6 +12,7 @@ public class ColumnTypeMapperService {
             case MSSQL -> MssqlOrdaColumnType.map(sourceType);
             case POSTGRES -> PostgresColumnType.map(sourceType);
             case ORACLE -> OracleOrdaColumnType.map(sourceType);
+            case SAPIQ -> SapIqColumnType.map(sourceType);
         };
     }
 }

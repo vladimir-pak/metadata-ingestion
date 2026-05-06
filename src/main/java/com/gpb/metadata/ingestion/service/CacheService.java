@@ -24,7 +24,8 @@ public class CacheService {
         final Map<String, String> schemaTypeMap = Map.of(
             "postgres", schemasProperties.getPostgres(),
             "mssql", schemasProperties.getMssql(),
-            "oracle", schemasProperties.getOracle()
+            "oracle", schemasProperties.getOracle(),
+            "sapiq", schemasProperties.getSapiq()
         );
         String schemaName = schemaTypeMap.get(schema);
         databaseCacheService.destroyRuntimeCache(schemaName, serviceName);
