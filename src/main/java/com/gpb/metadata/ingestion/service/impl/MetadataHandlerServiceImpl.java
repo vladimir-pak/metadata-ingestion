@@ -383,11 +383,14 @@ public class MetadataHandlerServiceImpl implements MetadataHandlerService {
             // Lineage request
             try {
                 List<AddLineageRequest> viewRequests = viewRequestBuilder.buildEdgesForView(view, dbType);
+                log.info("viewRequest. fromEntity: {}, toEntity: {}",
+                    viewRequests.get(0).getEdge().getFromEntity().getId(),
+                    viewRequests.get(0).getEdge().getToEntity().getId());
                 requests.addAll(viewRequests);
             } catch (RuntimeException e) {
                 log.error("Error while parsing viewDefinition: {}. {}", view.getFqn(), e.getMessage());
                 continue;
-            }            
+            }
         }
 
         String token = keycloakAuthService.getValidAccessToken();

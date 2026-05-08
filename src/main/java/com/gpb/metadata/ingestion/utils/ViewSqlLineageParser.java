@@ -3,6 +3,7 @@ package com.gpb.metadata.ingestion.utils;
 import net.sf.jsqlparser.parser.CCJSqlParserUtil;
 import net.sf.jsqlparser.schema.Table;
 import net.sf.jsqlparser.statement.Statement;
+import net.sf.jsqlparser.statement.create.view.CreateView;
 import net.sf.jsqlparser.statement.select.FromItem;
 import net.sf.jsqlparser.statement.select.Join;
 import net.sf.jsqlparser.statement.select.PlainSelect;
@@ -38,7 +39,13 @@ public final class ViewSqlLineageParser {
 
         try {
             Statement stmt = CCJSqlParserUtil.parse(viewDefinition);
-            if (!(stmt instanceof Select sel)) {
+
+            Select sel;
+            if (stmt instanceof Select s) {
+                sel = s;
+            } else if (stmt instanceof CreateView cv) {
+                sel = cv.getSelect();
+            } else {
                 return new ParsedLineage(Map.of(), Set.of(), List.of());
             }
 
