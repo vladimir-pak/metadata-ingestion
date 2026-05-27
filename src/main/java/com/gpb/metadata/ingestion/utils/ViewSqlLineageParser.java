@@ -6,9 +6,11 @@ import net.sf.jsqlparser.statement.Statement;
 import net.sf.jsqlparser.statement.create.view.CreateView;
 import net.sf.jsqlparser.statement.select.FromItem;
 import net.sf.jsqlparser.statement.select.Join;
+import net.sf.jsqlparser.statement.select.ParenthesedSelect;
 import net.sf.jsqlparser.statement.select.PlainSelect;
 import net.sf.jsqlparser.statement.select.Select;
 import net.sf.jsqlparser.statement.select.SelectItem;
+import net.sf.jsqlparser.statement.select.SetOperationList;
 import net.sf.jsqlparser.expression.Expression;
 import net.sf.jsqlparser.expression.ExpressionVisitorAdapter;
 import net.sf.jsqlparser.schema.Column;
@@ -49,19 +51,53 @@ public final class ViewSqlLineageParser {
                 return new ParsedLineage(Map.of(), Set.of(), List.of());
             }
 
-            var body = sel.getSelectBody();
-            if (!(body instanceof PlainSelect ps)) {
-                return new ParsedLineage(Map.of(), Set.of(), List.of());
-            }
+            Map<String, TableRef> aliasToTable = new LinkedHashMap<>();
+            Set<TableRef> upstream = new LinkedHashSet<>();
+            List<ColumnMapping> mappings = new ArrayList<>();
 
-            Map<String, TableRef> aliasToTable = extractAliasToTable(ps);
-            Set<TableRef> upstream = new LinkedHashSet<>(aliasToTable.values());
-            List<ColumnMapping> mappings = extractColumnMappings(ps);
+            collectFromSelect(sel, aliasToTable, upstream, mappings);
 
             return new ParsedLineage(aliasToTable, upstream, mappings);
 
         } catch (Exception e) {
             return new ParsedLineage(Map.of(), Set.of(), List.of());
+        }
+    }
+
+    private static void collectFromSelect(
+            Select select,
+            Map<String, TableRef> aliasToTable,
+            Set<TableRef> upstream,
+            List<ColumnMapping> mappings
+    ) {
+        if (select == null) {
+            return;
+        }
+
+        if (select instanceof PlainSelect ps) {
+            Map<String, TableRef> localAliases = extractAliasToTable(ps);
+
+            aliasToTable.putAll(localAliases);
+            upstream.addAll(localAliases.values());
+            mappings.addAll(extractColumnMappings(ps));
+
+            return;
+        }
+
+        if (select instanceof SetOperationList setOperationList) {
+            List<Select> selects = setOperationList.getSelects();
+
+            if (selects != null) {
+                for (Select child : selects) {
+                    collectFromSelect(child, aliasToTable, upstream, mappings);
+                }
+            }
+
+            return;
+        }
+
+        if (select instanceof ParenthesedSelect parenthesedSelect) {
+            collectFromSelect(parenthesedSelect.getSelect(), aliasToTable, upstream, mappings);
         }
     }
 
