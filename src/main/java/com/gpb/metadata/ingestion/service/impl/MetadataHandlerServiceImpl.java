@@ -9,6 +9,10 @@ import com.gpb.metadata.ingestion.properties.MetadataSchemasProperties;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
+
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.gpb.metadata.ingestion.cache.CacheComparisonResult;
 import com.gpb.metadata.ingestion.dto.DatabaseServiceMetadataDto;
 import com.gpb.metadata.ingestion.dto.lineage.AddLineageRequest;
@@ -24,6 +28,7 @@ import com.gpb.metadata.ingestion.service.MetadataHandlerService;
 import com.gpb.metadata.ingestion.utils.OrdaClient;
 import com.gpb.metadata.ingestion.utils.ViewLineageRequestBuilder;
 
+import io.swagger.v3.core.util.Json;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import reactor.core.publisher.Flux;
@@ -88,14 +93,21 @@ public class MetadataHandlerServiceImpl implements MetadataHandlerService {
                 (webClientProperties.getDatabaseServiceEndpoint() + "/name/" + serviceName),
                 token);
         if (!isExists) {
+            ObjectMapper mapper = new ObjectMapper();
             log.info("Creating databaseService: {}", serviceName);
             String dbServiceUrl = webClientProperties.getDatabaseServiceEndpoint();
+            String serviceType = type.getValue().substring(0, 1).toUpperCase() + 
+                    type.getValue().substring(1);
+
+            ObjectNode connection = mapper.createObjectNode();
+            ObjectNode connectionConfig = connection.putObject("config");
+            connectionConfig.put("type", serviceType);
+
             DatabaseServiceMetadataDto dbServiceDto = DatabaseServiceMetadataDto.builder()
                     .name(serviceName)
                     .displayName(serviceName)
-                    .serviceType(
-                        type.getValue().substring(0, 1).toUpperCase() + 
-                                type.getValue().substring(1))
+                    .serviceType(serviceType)
+                    .connection(connection)
                     .build();
             log.info("DTO creating DB: name={}; serviceType={}", dbServiceDto.getName(), dbServiceDto.getServiceType());
             Mono<String> resp = ordaClient.putRequest(dbServiceUrl, dbServiceDto, token, String.class);
