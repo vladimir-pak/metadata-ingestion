@@ -1,5 +1,6 @@
 package com.gpb.metadata.ingestion.dto.mapper;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 import java.util.stream.Collectors;
@@ -103,6 +104,12 @@ public class MapperDto {
         List<TableConstraints> filteredConstraints = Optional.ofNullable(tableData.getTableConstraints())
                 .orElseGet(List::of)
                 .stream()
+                .map(c -> {
+                    if (c.getReferredColumns() == null) {
+                        c.setReferredColumns(new ArrayList<>());
+                    }
+                    return c;
+                })
                 .filter(c -> {
                     boolean keep = ConstraintType.isSupported(c.getConstraintType());
                     if (!keep) {

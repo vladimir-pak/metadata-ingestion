@@ -19,4 +19,7 @@ public class TableConstraints {
 
     @JsonProperty("constraintType")
     private String constraintType;
+
+    @JsonProperty("referredColumns")
+    private List<String> referredColumns;
 }
