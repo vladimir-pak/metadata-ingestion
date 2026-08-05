@@ -1,6 +1,5 @@
 package com.gpb.metadata.ingestion.dto.mapper;
 
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 import java.util.stream.Collectors;
@@ -72,11 +71,12 @@ public class MapperDto {
                 .map(column -> {
                     String processedDataType = columnTypeMapperService.map(serviceType, column.getDataType());
 
-                    String processedDataLength = TypesWithDataLength.getProcessedDataLength(
-                            processedDataType,
-                            column.getDataLength()
-                    );
+                    // String processedDataLength = TypesWithDataLength.getProcessedDataLength(
+                    //         processedDataType,
+                    //         column.getDataLength()
+                    // );
 
+                    String processedDataLength =column.getDataLength() == null ? "0" : column.getDataLength();
                     String precision = column.getPrecision() == null ? "0" : column.getPrecision();
                     String scale = column.getScale() == null ? "0" : column.getScale();
 
@@ -104,17 +104,16 @@ public class MapperDto {
         List<TableConstraints> filteredConstraints = Optional.ofNullable(tableData.getTableConstraints())
                 .orElseGet(List::of)
                 .stream()
-                .map(c -> {
-                    if (c.getReferredColumns() == null) {
-                        c.setReferredColumns(new ArrayList<>());
-                    }
-                    return c;
-                })
                 .filter(c -> {
                     boolean keep = ConstraintType.isSupported(c.getConstraintType());
                     if (!keep) {
                         log.debug("Constraint '{}' пропущен — не поддерживается Ордой",
                                 c.getConstraintType());
+                    }
+                    if (c.getConstraintType().equals("FOREIGN_KEY") & c.getReferredColumns() == null) {
+                        log.debug("Constraint '{}' пропущен — не найдены ссылки на внешние ключи",
+                                c.getConstraintType());
+                        return false;
                     }
                     return keep;
                 })

@@ -7,7 +7,8 @@ public enum TypesWithDataLength {
     VARCHAR,
     CHAR,
     BINARY,
-    VARBINARY;
+    VARBINARY,
+    UUID;
     
     public static String getProcessedDataLength(String dataType, String dataLength) {
         // Если тип не поддерживается или dataType null, возвращаем исходное значение
