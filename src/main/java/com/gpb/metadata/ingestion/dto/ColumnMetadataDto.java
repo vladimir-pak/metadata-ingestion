@@ -25,6 +25,12 @@ public class ColumnMetadataDto {
     @JsonProperty("dataLength")
     private String dataLength;
 
+    @JsonProperty("precision")
+    private String precision;
+
+    @JsonProperty("scale")
+    private String scale;
+
     @JsonProperty("description")
     private String description;
 

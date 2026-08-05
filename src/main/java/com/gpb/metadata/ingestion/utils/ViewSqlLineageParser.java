@@ -19,9 +19,12 @@ import net.sf.jsqlparser.statement.select.AllTableColumns;
 
 import org.springframework.stereotype.Component;
 
+import lombok.extern.slf4j.Slf4j;
+
 import java.util.*;
 
 @Component
+@Slf4j
 public final class ViewSqlLineageParser {
 
     public record TableRef(String schema, String name) {}
@@ -60,6 +63,11 @@ public final class ViewSqlLineageParser {
             return new ParsedLineage(aliasToTable, upstream, mappings);
 
         } catch (Exception e) {
+            String preview = viewDefinition.length() > 1000
+                    ? viewDefinition.substring(0, 1000)
+                    : viewDefinition;
+
+            log.warn("Cannot parse viewDefinition. First chars:\n{}", preview, e);
             return new ParsedLineage(Map.of(), Set.of(), List.of());
         }
     }

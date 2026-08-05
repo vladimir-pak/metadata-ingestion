@@ -76,6 +76,9 @@ public class MapperDto {
                             column.getDataLength()
                     );
 
+                    String precision = column.getPrecision() == null ? "0" : column.getPrecision();
+                    String scale = column.getScale() == null ? "0" : column.getScale();
+
                     String constraint = column.getConstraint();
                     if ("NULLABLE".equalsIgnoreCase(constraint)) {
                         constraint = null;
@@ -87,6 +90,8 @@ public class MapperDto {
                             .arrayDataType(resolveArrayType(column.getDataType(), processedDataType))
                             .dataTypeDisplay(column.getDataTypeDisplay())
                             .dataLength(processedDataLength)
+                            .precision(precision)
+                            .scale(scale)
                             .description(column.getDescription())
                             .constraint(constraint)
                             .ordinalPosition(column.getOrdinalPosition())
