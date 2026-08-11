@@ -4,8 +4,11 @@ import java.util.*;
 import java.util.stream.Collectors;
 
 import com.gpb.metadata.ingestion.enums.ServiceType;
-import com.gpb.metadata.ingestion.exceptions.OrdaNotFoundException;
+import com.gpb.metadata.ingestion.exceptions.TokenRefreshException;
 import com.gpb.metadata.ingestion.properties.MetadataSchemasProperties;
+import com.gpb.metadata.ingestion.repository.OpenMetadataTableSnapshotRepository;
+import com.gpb.metadata.ingestion.snapshot.TableSnapshot;
+import com.gpb.metadata.ingestion.snapshot.TableSnapshotEntry;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
@@ -22,7 +25,6 @@ import com.gpb.metadata.ingestion.model.postgres.SchemaMetadata;
 import com.gpb.metadata.ingestion.model.postgres.TableMetadata;
 import com.gpb.metadata.ingestion.model.schema.TableData;
 import com.gpb.metadata.ingestion.properties.WebClientProperties;
-import com.gpb.metadata.ingestion.service.KeycloakAuthService;
 import com.gpb.metadata.ingestion.service.MetadataHandlerService;
 import com.gpb.metadata.ingestion.utils.OrdaClient;
 import com.gpb.metadata.ingestion.utils.ViewLineageRequestBuilder;
@@ -47,8 +49,9 @@ public class MetadataHandlerServiceImpl implements MetadataHandlerService {
     private final WebClientProperties webClientProperties;
     private final MetadataSchemasProperties schemasProperties;
 
-    private final KeycloakAuthService keycloakAuthService;
     private final OrdaClient ordaClient;
+    private final OpenMetadataTableSnapshotRepository tableSnapshotRepository;
+
 
     @Value("${ord.api.max-connections:5}")
     private Integer maxConn;
@@ -82,14 +85,10 @@ public class MetadataHandlerServiceImpl implements MetadataHandlerService {
          * Проверяем наличие DatabaseService в ОРДе
          * Если сервиса нет, то создаем
          */
-        String token = keycloakAuthService.getValidAccessToken();
-        if (token == null) {
-            log.error("ORD access_token is not resolved");
-            return;
-        }
         boolean isExists = ordaClient.checkEntityExists(
-                (webClientProperties.getDatabaseServiceEndpoint() + "/name/" + serviceName),
-                token);
+                webClientProperties.getDatabaseServiceEndpoint() + "/name/" + serviceName
+        );
+
         if (!isExists) {
             ObjectMapper mapper = new ObjectMapper();
             log.info("Creating databaseService: {}", serviceName);
@@ -108,7 +107,7 @@ public class MetadataHandlerServiceImpl implements MetadataHandlerService {
                     .connection(connection)
                     .build();
             log.info("DTO creating DB: name={}; serviceType={}", dbServiceDto.getName(), dbServiceDto.getServiceType());
-            Mono<String> resp = ordaClient.putRequest(dbServiceUrl, dbServiceDto, token, String.class);
+            Mono<String> resp = ordaClient.putRequest(dbServiceUrl, dbServiceDto, String.class);
             String respString = resp.block();
             log.info("Response for creating DB: {}", respString);
         }
@@ -133,12 +132,29 @@ public class MetadataHandlerServiceImpl implements MetadataHandlerService {
                 putSchemas.size(),
                 schemaError);
 
+        TableSnapshot tableSnapshot = tableSnapshotRepository.loadByServiceName(serviceName);
+        log.info("DbService \"{}\". Loaded Table snapshot before PUT: {} entities.",
+                serviceName,
+                tableSnapshot.size());
+
         Collection<TableMetadata> putTables = cacheTable.getPutRecords().values();
-        int tableError = tablePutRequest(putTables, webClientProperties.getTableEndpoint(), type);
+        int tableError = tablePutRequest(
+                putTables,
+                webClientProperties.getTableEndpoint(),
+                type,
+                tableSnapshot
+        );
         log.info("DbService \"{}\". Tables to PUT: {}. With errors: {}.",
                 serviceName,
                 putTables.size(),
                 tableError);
+
+        // После PUT перечитываем snapshot одним SQL-запросом.
+        // Так в snapshot появляются id новых таблиц, необходимые для lineage.
+        tableSnapshot = tableSnapshotRepository.loadByServiceName(serviceName);
+        log.info("DbService \"{}\". Reloaded Table snapshot after PUT: {} entities.",
+                serviceName,
+                tableSnapshot.size());
 
         Collection<TableMetadata> viewTables = putTables.stream()
             .filter(table -> {
@@ -147,7 +163,12 @@ public class MetadataHandlerServiceImpl implements MetadataHandlerService {
             })
             .collect(Collectors.toList());
 
-        viewLineageRequest(viewTables, webClientProperties.getLineageEndpoint(), schemaName);
+        viewLineageRequest(
+                viewTables,
+                webClientProperties.getLineageEndpoint(),
+                schemaName,
+                tableSnapshot
+        );
         
         /*
          * Удаляем сущности в порядке очередности:
@@ -156,7 +177,11 @@ public class MetadataHandlerServiceImpl implements MetadataHandlerService {
          * 3. БД
          */
         Collection<TableMetadata> toDeleteTable = cacheTable.getDeletedRecords().values();
-        int tableErrorDel = tableDeleteRequest(toDeleteTable, webClientProperties.getTableDeleteEndpoint());
+        int tableErrorDel = tableDeleteRequest(
+                toDeleteTable,
+                webClientProperties.getTableDeleteEndpoint(),
+                tableSnapshot
+        );
         log.info("DbService \"{}\". Tables to DEL: {}. With errors: {}.",
                 serviceName,
                 toDeleteTable.size(),
@@ -178,255 +203,271 @@ public class MetadataHandlerServiceImpl implements MetadataHandlerService {
     }
 
     private int databasePutRequest(Collection<DatabaseMetadata> meta, String endpoint) {
-        String token = keycloakAuthService.getValidAccessToken();
-        if (token == null) {
-            log.error("ORD access_token is not resolved");
-            return meta.size(); // считаем, что все упали
-        }
-
         return Flux.fromIterable(meta)
                 .flatMap(value ->
-                        ordaClient.putRequest(
-                                        endpoint,
-                                        mapperDto.getDto(DbObjectType.DATABASE, value, null),
-                                        token,
-                                        Void.class)
-                                .doOnSuccess(response ->
-                                        log.info("Успешно создано/обновлено {}: {}",
-                                                DbObjectType.DATABASE.name().toLowerCase(), value.getFqn())
-                                )
-                                .doOnError(error ->
-                                        log.error("Ошибка при создании/обновлении {}: {}",
-                                                value.getFqn(), error.getMessage())
-                                )
-                                .map(r -> 0)                // успех = 0 ошибок
-                                .onErrorReturn(1),         // ошибка = 1
+                                ordaClient.putRequest(
+                                                endpoint,
+                                                mapperDto.getDto(DbObjectType.DATABASE, value, null),
+                                                Void.class
+                                        )
+                                        .doOnSuccess(response ->
+                                                log.info("Успешно создано/обновлено {}: {}",
+                                                        DbObjectType.DATABASE.name().toLowerCase(),
+                                                        value.getFqn())
+                                        )
+                                        .doOnError(error ->
+                                                log.error("Ошибка при создании/обновлении {}: {}",
+                                                        value.getFqn(),
+                                                        error.getMessage())
+                                        )
+                                        .thenReturn(0)
+                                        .onErrorResume(this::countEntityError),
                         maxConn
                 )
-                .reduce(0, Integer::sum)   // суммируем все ошибки
-                .block();                  // ждем и получаем int
+                .reduce(0, Integer::sum)
+                .block();
     }
 
     private int databaseDeleteRequest(Collection<DatabaseMetadata> meta, String endpoint) {
-        String token = keycloakAuthService.getValidAccessToken();
-        if (token == null) {
-            log.error("ORD access_token is not resolved");
-            return meta.size();
-        }
         return Flux.fromIterable(meta)
-                .flatMap(value -> 
-                    ordaClient.deleteRequest(
-                            String.format("%s/%s", endpoint, value.getFqn()),
-                            token)
-                        .doOnSuccess(response -> 
-                            log.info("Успешно удалено {}", value.getFqn())
-                        )
-                        .doOnError(error -> 
-                            log.error("Ошибка при удалении {}: {}", value.getFqn(), error.getMessage())
-                        )
-                        // .onErrorResume(error -> Mono.empty()),
-                        .map(r -> 0)
-                        .onErrorReturn(1),
-                    maxConn
+                .flatMap(value ->
+                                ordaClient.deleteRequest(
+                                                String.format("%s/%s", endpoint, value.getFqn())
+                                        )
+                                        .doOnSuccess(response ->
+                                                log.info("Успешно удалено {}", value.getFqn())
+                                        )
+                                        .doOnError(error ->
+                                                log.error("Ошибка при удалении {}: {}",
+                                                        value.getFqn(),
+                                                        error.getMessage())
+                                        )
+                                        .thenReturn(0)
+                                        .onErrorResume(this::countEntityError),
+                        maxConn
                 )
-                // .then() // Преобразуем в Mono<Void>
                 .reduce(0, Integer::sum)
-                .block(); // Ждем завершения всех
+                .block();
     }
 
     private int schemaPutRequest(Collection<SchemaMetadata> meta, String endpoint) {
-        String token = keycloakAuthService.getValidAccessToken();
-        if (token == null) {
-            log.error("ORD access_token is not resolved");
-            return meta.size();
-        }
         return Flux.fromIterable(meta)
-                .flatMap(value -> 
-                    ordaClient.putRequest(
-                            endpoint, 
-                            mapperDto.getDto(DbObjectType.SCHEMA, value, null), 
-                            token,
-                            Void.class)
-                        .doOnSuccess(response -> 
-                            log.info("Успешно создано/обновлено {}: {}", DbObjectType.SCHEMA.name().toLowerCase(), value.getFqn())
-                        )
-                        .doOnError(error -> 
-                            log.error("Ошибка при создании/обновлении {}: {}", value.getFqn(), error.getMessage())
-                        )
-                        // .onErrorResume(error -> Mono.empty()),
-                        .map(r -> 0)
-                        .onErrorReturn(1),
-                    maxConn
+                .flatMap(value ->
+                                ordaClient.putRequest(
+                                                endpoint,
+                                                mapperDto.getDto(DbObjectType.SCHEMA, value, null),
+                                                Void.class
+                                        )
+                                        .doOnSuccess(response ->
+                                                log.info("Успешно создано/обновлено {}: {}",
+                                                        DbObjectType.SCHEMA.name().toLowerCase(),
+                                                        value.getFqn())
+                                        )
+                                        .doOnError(error ->
+                                                log.error("Ошибка при создании/обновлении {}: {}",
+                                                        value.getFqn(),
+                                                        error.getMessage())
+                                        )
+                                        .thenReturn(0)
+                                        .onErrorResume(this::countEntityError),
+                        maxConn
                 )
-                // .then() // Преобразуем в Mono<Void>
                 .reduce(0, Integer::sum)
-                .block(); // Ждем завершения всех
+                .block();
     }
 
     private int schemaDeleteRequest(Collection<SchemaMetadata> meta, String endpoint) {
-        String token = keycloakAuthService.getValidAccessToken();
-        if (token == null) {
-            log.error("ORD access_token is not resolved");
-            return meta.size();
-        }
         return Flux.fromIterable(meta)
-                .flatMap(value -> 
-                    ordaClient.deleteRequest(
-                            String.format("%s/%s", endpoint, value.getFqn()),
-                            token)
-                        .doOnSuccess(response -> 
-                            log.info("Успешно удалено {}", value.getFqn())
-                        )
-                        .doOnError(error -> 
-                            log.error("Ошибка при удалении {}: {}", value.getFqn(), error.getMessage())
-                        )
-                        // .onErrorResume(error -> Mono.empty()),
-                        .map(r -> 0)
-                        .onErrorReturn(1),
-                    maxConn
+                .flatMap(value ->
+                                ordaClient.deleteRequest(
+                                                String.format("%s/%s", endpoint, value.getFqn())
+                                        )
+                                        .doOnSuccess(response ->
+                                                log.info("Успешно удалено {}", value.getFqn())
+                                        )
+                                        .doOnError(error ->
+                                                log.error("Ошибка при удалении {}: {}",
+                                                        value.getFqn(),
+                                                        error.getMessage())
+                                        )
+                                        .thenReturn(0)
+                                        .onErrorResume(this::countEntityError),
+                        maxConn
                 )
-                // .then() // Преобразуем в Mono<Void>
                 .reduce(0, Integer::sum)
-                .block(); // Ждем завершения всех
+                .block();
     }
 
-    private int tablePutRequest(Collection<TableMetadata> meta, String endpoint, ServiceType serviceType) {
-        String token = keycloakAuthService.getValidAccessToken();
-        if (token == null) {
-            log.error("ORD access_token is not resolved");
-            return meta.size();
-        }
+    private int tablePutRequest(
+            Collection<TableMetadata> meta,
+            String endpoint,
+            ServiceType serviceType,
+            TableSnapshot tableSnapshot) {
+
         return Flux.fromIterable(meta)
-            .flatMap(value -> {
-                String url = String.format("%s/name/%s", endpoint, value.getFqn());
+                .flatMap(value -> {
+                    TableSnapshotEntry existing = tableSnapshot.find(value.getFqn()).orElse(null);
+                    if (existing != null && existing.projectEntity()) {
+                        log.info(
+                                "Пропуск проектной сущности {} (isProjectEntity=true)",
+                                value.getFqn()
+                        );
+                        return Mono.empty();
+                    }
 
-                Mono<Boolean> shouldPutMono = ordaClient.getIsProjectEntity(url, token)
-                    .map(isProject -> {
-                        if (isProject) {
-                            log.info("Пропуск проектной сущности {} (isProjectEntity=true)", value.getFqn());
-                            return false; // PUT НЕ надо
-                        }
-                        return true; // isProjectEntity=false => PUT надо
-                    })
-                    .onErrorResume(OrdaNotFoundException.class, e -> {
-                        // 404 => PUT надо
-                        return Mono.just(true);
-                    })
-                    .onErrorResume(e -> {
-                        // прочие ошибки => PUT НЕ надо
-                        log.error("GET isProjectEntity ошибка для {}, PUT пропущен: {}", value.getFqn(), e.getMessage());
-                        return Mono.just(false);
-                    });
-
-                return shouldPutMono.flatMap(shouldPut -> {
-                    if (!shouldPut) return Mono.empty();
-
-                    Object body = mapperDto.getDto(DbObjectType.TABLE, value, serviceType);
+                    Object body = mapperDto.getDto(
+                            DbObjectType.TABLE,
+                            value,
+                            serviceType
+                    );
                     if (body == null) {
                         return Mono.just(1);
                     }
 
                     return ordaClient.putRequest(
-                            endpoint, 
-                            body,
-                            token,
-                            Void.class)
-                        .doOnSuccess(r -> log.info("Успешно создано/обновлено table: {}", value.getFqn()))
-                        .doOnError(e -> log.error("Ошибка PUT {}: {}", value.getFqn(), e.getMessage()))
-                        // .onErrorResume(e -> Mono.empty());
-                        .map(r -> 0)
-                        .onErrorReturn(1);
-                });
-            }, maxConn)
-            // .then()
-            .reduce(0, Integer::sum)
-            .block();
+                                    endpoint,
+                                    body,
+                                    Void.class
+                            )
+                            .doOnSuccess(response ->
+                                    log.info(
+                                            "Успешно создано/обновлено table: {}",
+                                            value.getFqn()
+                                    )
+                            )
+                            .doOnError(error ->
+                                    log.error(
+                                            "Ошибка PUT {}: {}",
+                                            value.getFqn(),
+                                            error.getMessage()
+                                    )
+                            )
+                            .thenReturn(0)
+                            .onErrorResume(this::countEntityError);
+                }, maxConn)
+                .reduce(0, Integer::sum)
+                .block();
     }
 
-    private int tableDeleteRequest(Collection<TableMetadata> meta, String endpoint) {
-        String token = keycloakAuthService.getValidAccessToken();
-        if (token == null) {
-            log.error("ORD access_token is not resolved");
-            return meta.size();
-        }
+    private int tableDeleteRequest(
+            Collection<TableMetadata> meta,
+            String endpoint,
+            TableSnapshot tableSnapshot) {
+
         return Flux.fromIterable(meta)
-            .filterWhen(value ->
-                ordaClient.getIsProjectEntity(
-                        String.format("%s/%s", endpoint, value.getFqn()),
-                        token)
-                    .map(isProject -> !isProject) // true => удаляем только если НЕ проектная
-                    .doOnNext(shouldDelete -> {
-                        if (!shouldDelete) {
-                            log.info("Пропуск удаления {} (isProjectEntity=true)", value.getFqn());
-                        }
-                    })
-                    .onErrorResume(e -> {
-                        // 404 и любые ошибки => НЕ удаляем
-                        if (e instanceof OrdaNotFoundException) {
-                            log.info("Не найдено (404), удаление пропускаем: {}", value.getFqn());
-                        } else {
-                            log.error("GET isProjectEntity ошибка, удаление пропускаем {}: {}", value.getFqn(), e.getMessage());
-                        }
-                        return Mono.just(false);
-                    })
-            )
-            .flatMap(value ->
-                ordaClient.deleteRequest(
-                        String.format("%s/%s", endpoint, value.getFqn()),
-                        token)
-                    .doOnSuccess(v -> log.info("Успешно удалено {}", value.getFqn()))
-                    .doOnError(e -> log.error("Ошибка при удалении {}: {}", value.getFqn(), e.getMessage()))
-                    // .onErrorResume(e -> Mono.empty()),
-                    .map(r -> 0)
-                    .onErrorReturn(1),
-                maxConn
-            )
-            // .then()
-            .reduce(0, Integer::sum)
-            .block();
+                .filter(value -> {
+                    TableSnapshotEntry existing = tableSnapshot.find(value.getFqn()).orElse(null);
+                    if (existing == null) {
+                        log.info(
+                                "Удаление пропущено: таблица {} отсутствует в OMD snapshot",
+                                value.getFqn()
+                        );
+                        return false;
+                    }
+
+                    if (existing.projectEntity()) {
+                        log.info(
+                                "Пропуск удаления {} (isProjectEntity=true)",
+                                value.getFqn()
+                        );
+                        return false;
+                    }
+
+                    return true;
+                })
+                .flatMap(value ->
+                                ordaClient.deleteRequest(
+                                                String.format("%s/%s", endpoint, value.getFqn())
+                                        )
+                                        .doOnSuccess(response ->
+                                                log.info("Успешно удалено {}", value.getFqn())
+                                        )
+                                        .doOnError(error ->
+                                                log.error(
+                                                        "Ошибка при удалении {}: {}",
+                                                        value.getFqn(),
+                                                        error.getMessage()
+                                                )
+                                        )
+                                        .thenReturn(0)
+                                        .onErrorResume(this::countEntityError),
+                        maxConn
+                )
+                .reduce(0, Integer::sum)
+                .block();
     }
 
-    private void viewLineageRequest(Collection<TableMetadata> meta, String endpoint, String dbType) {
+    private void viewLineageRequest(
+            Collection<TableMetadata> meta,
+            String endpoint,
+            String dbType,
+            TableSnapshot tableSnapshot) {
         List<AddLineageRequest> requests = new ArrayList<>();
 
         for (TableMetadata view : meta) {
-            // Lineage request
             try {
-                List<AddLineageRequest> viewRequests = viewRequestBuilder.buildEdgesForView(view, dbType);
+                List<AddLineageRequest> viewRequests = viewRequestBuilder.buildEdgesForView(
+                        view,
+                        dbType,
+                        tableSnapshot
+                );
+                if (viewRequests.isEmpty()) {
+                    continue;
+                }
                 log.info("viewRequest. fromEntity: {}, toEntity: {}",
-                    viewRequests.get(0).getEdge().getFromEntity().getId(),
-                    viewRequests.get(0).getEdge().getToEntity().getId());
+                        viewRequests.get(0).getEdge().getFromEntity().getId(),
+                        viewRequests.get(0).getEdge().getToEntity().getId());
                 requests.addAll(viewRequests);
             } catch (RuntimeException e) {
                 log.error("Error while parsing viewDefinition: {}. {}", view.getFqn(), e.getMessage());
-                continue;
             }
         }
 
-        String token = keycloakAuthService.getValidAccessToken();
-        if (token == null) {
-            log.error("ORD access_token is not resolved");
-            return;
-        }
         Flux.fromIterable(requests)
-                .flatMap(value -> 
-                    ordaClient.putRequest(
-                            endpoint, 
-                            value, 
-                            token,
-                            Void.class)
-                        .doOnSuccess(response -> 
-                            log.info("Успешно создано/обновлено ViewLineage: {}", 
-                                    value.getEdge().getToEntity().getId())
-                        )
-                        .doOnError(error -> 
-                            log.error("Ошибка при создании/обновлении ViewLineage {}: {}", 
-                                    value.getEdge().getToEntity().getId(), error.getMessage())
-                        )
-                        .onErrorResume(error -> Mono.empty()),
-                    maxConn
+                .flatMap(value ->
+                                ordaClient.putRequest(
+                                                endpoint,
+                                                value,
+                                                Void.class
+                                        )
+                                        .doOnSuccess(response ->
+                                                log.info("Успешно создано/обновлено ViewLineage: {}",
+                                                        value.getEdge().getToEntity().getId())
+                                        )
+                                        .doOnError(error ->
+                                                log.error("Ошибка при создании/обновлении ViewLineage {}: {}",
+                                                        value.getEdge().getToEntity().getId(),
+                                                        error.getMessage())
+                                        )
+                                        .onErrorResume(error -> {
+                                            if (isCriticalError(error)) {
+                                                return Mono.error(error);
+                                            }
+                                            return Mono.empty();
+                                        }),
+                        maxConn
                 )
-                .then() // Преобразуем в Mono<Void>
-                .block(); // Ждем завершения всех
+                .then()
+                .block();
+    }
+
+
+
+    private Mono<Integer> countEntityError(Throwable error) {
+        if (isCriticalError(error)) {
+            return Mono.error(error);
+        }
+        return Mono.just(1);
+    }
+
+    private boolean isCriticalError(Throwable error) {
+        Throwable current = error;
+        while (current != null) {
+            if (current instanceof TokenRefreshException) {
+                return true;
+            }
+            current = current.getCause();
+        }
+        return false;
     }
 }

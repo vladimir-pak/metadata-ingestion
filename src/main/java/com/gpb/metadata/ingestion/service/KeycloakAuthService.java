@@ -26,13 +26,40 @@ public class KeycloakAuthService {
         if (currentToken == null) {
             currentToken = fetchToken();
         } else if (currentToken.isAccessTokenExpired()) {
-            if (!currentToken.isRefreshTokenExpired()) {
-                currentToken = refreshToken(currentToken.getRefreshToken());
-            } else {
-                currentToken = fetchToken();
-            }
+            currentToken = refreshOrFetch(currentToken);
         }
-        return currentToken.getAccessToken();
+        return getAccessToken(currentToken);
+    }
+
+    /**
+     * Принудительно обновить access token. Используется после HTTP 401 от ORD,
+     * когда локальная проверка expires_in ещё может считать старый токен валидным.
+     */
+    public synchronized String forceRefreshAccessToken() {
+        if (currentToken == null) {
+            currentToken = fetchToken();
+        } else {
+            currentToken = refreshOrFetch(currentToken);
+        }
+        return getAccessToken(currentToken);
+    }
+
+    private KeycloakTokenResponse refreshOrFetch(KeycloakTokenResponse token) {
+        if (!token.isRefreshTokenExpired()
+                && token.getRefreshToken() != null
+                && !token.getRefreshToken().isBlank()) {
+            return refreshToken(token.getRefreshToken());
+        }
+        return fetchToken();
+    }
+
+    private String getAccessToken(KeycloakTokenResponse token) {
+        if (token == null
+                || token.getAccessToken() == null
+                || token.getAccessToken().isBlank()) {
+            throw new IllegalStateException("ORD access_token is not resolved");
+        }
+        return token.getAccessToken();
     }
 
     /** Первый вход по логину и паролю */

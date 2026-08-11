@@ -3,50 +3,37 @@ package com.gpb.metadata.ingestion.utils;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 
-import org.springframework.lang.NonNull;
 import org.springframework.stereotype.Component;
 
 import com.gpb.metadata.ingestion.dto.lineage.LineageSource;
 import com.gpb.metadata.ingestion.model.postgres.TableMetadata;
 import com.gpb.metadata.ingestion.model.schema.ColumnData;
 import com.gpb.metadata.ingestion.model.schema.TableData;
-import com.gpb.metadata.ingestion.properties.WebClientProperties;
-import com.gpb.metadata.ingestion.service.KeycloakAuthService;
 import com.gpb.metadata.ingestion.service.impl.TableMetadataCacheServiceImpl;
 import com.gpb.metadata.ingestion.dto.lineage.AddLineageRequest;
 import com.gpb.metadata.ingestion.dto.lineage.ColumnsLineage;
 import com.gpb.metadata.ingestion.dto.lineage.EntityReference;
 import com.gpb.metadata.ingestion.dto.lineage.LineageDetails;
 import com.gpb.metadata.ingestion.dto.lineage.LineageEdge;
+import com.gpb.metadata.ingestion.snapshot.TableSnapshot;
 
 import java.util.*;
-import java.util.concurrent.ConcurrentHashMap;
 
 @Component
 @RequiredArgsConstructor
 @Slf4j
 public class ViewLineageRequestBuilder {
 
-    private final OrdaClient ordaClient;
     private final ViewSqlLineageParser parser;
-
-    private final KeycloakAuthService keycloakAuthService;
-    private final WebClientProperties webClientProperties;
-
     private final TableMetadataCacheServiceImpl tableCacheService;
-
-    // кэш только для OM id (FQN -> Optional<uuid>)
-    private final Map<String, Optional<String>> idCache = new ConcurrentHashMap<>();
 
     private static final List<String> DEFAULT_SCHEMA_FALLBACK =
             List.of("pg_catalog", "information_schema");
 
-    public List<AddLineageRequest> buildEdgesForView(TableMetadata viewDTO, String dbType) {
-        String token = keycloakAuthService.getValidAccessToken();
-        if (token == null) {
-            throw new RuntimeException("ORD access_token is not resolved");
-        }
-
+    public List<AddLineageRequest> buildEdgesForView(
+            TableMetadata viewDTO,
+            String dbType,
+            TableSnapshot tableSnapshot) {
         String dbName = viewDTO.getDbName();
         String schemaName = viewDTO.getSchemaName();
         if (dbName.contains(".")) {
@@ -62,7 +49,7 @@ public class ViewLineageRequestBuilder {
             normalizeIdent(viewDTO.getName())
         );
 
-        String viewId = resolveTableIdCached(viewFqn, token).orElse(null);
+        String viewId = tableSnapshot.findId(viewFqn).orElse(null);
         if (viewId == null) {
             log.warn("View {} отсутствует в OMD", viewFqn);
             return List.of();
@@ -145,7 +132,7 @@ public class ViewLineageRequestBuilder {
                     .filter(Objects::nonNull)
                     .toList();
 
-            String upstreamId = resolveTableIdCached(upstreamFqn, token).orElse(null);
+            String upstreamId = tableSnapshot.findId(upstreamFqn).orElse(null);
             if (upstreamId == null) {
                 log.warn("Upstream {} отсутствует в OMD", upstreamFqn);
                 continue;
@@ -292,11 +279,6 @@ public class ViewLineageRequestBuilder {
         }
 
         return null;
-    }
-
-    private Optional<String> resolveTableIdCached(String fqn, @NonNull String token) {
-        String endpoint = webClientProperties.getTableEndpoint() + "/name/" + fqn;
-        return idCache.computeIfAbsent(fqn, key -> ordaClient.resolveTableId(endpoint, token));
     }
 
     /**
