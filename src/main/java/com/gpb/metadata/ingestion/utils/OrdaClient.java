@@ -129,11 +129,15 @@ public class OrdaClient {
         });
     }
 
-    public Mono<Void> deleteRequest(@NonNull String endpoint) {
-        return withAuth(token -> deleteRequestInternal(endpoint, token));
+    public Mono<Void> deleteRequest(@NonNull String endpoint, boolean recursive) {
+        return withAuth(token -> deleteRequestInternal(endpoint, token, recursive));
     }
 
-    private Mono<Void> deleteRequestInternal(String endpoint, String token) {
+    private Mono<Void> deleteRequestInternal(
+            String endpoint,
+            String token,
+            boolean recursive
+    ) {
         return Mono.defer(() -> {
             OrdaHost orda = parseOrdaHost();
             long start = System.currentTimeMillis();
@@ -142,15 +146,22 @@ public class OrdaClient {
             return webClient.delete()
                     .uri(uriBuilder -> uriBuilder
                             .path(endpoint)
-                            .build())
-                    .header(HttpHeaders.AUTHORIZATION, "Bearer " + token)
+                            .queryParam("recursive", recursive)
+                            .build()
+                    )
+                    .header(
+                            HttpHeaders.AUTHORIZATION,
+                            "Bearer " + token
+                    )
                     .exchangeToMono(response -> {
-                        long duration = System.currentTimeMillis() - start;
+                        long duration =
+                                System.currentTimeMillis() - start;
 
                         if (response.statusCode().isError()) {
                             return response.bodyToMono(String.class)
                                     .defaultIfEmpty("")
                                     .flatMap(err -> {
+
                                         svoiCustomLogger.logOrdaRequest(
                                                 endpoint,
                                                 "DELETE",
@@ -171,7 +182,9 @@ public class OrdaClient {
                                             );
                                         }
 
-                                        return Mono.error(new RuntimeException(err));
+                                        return Mono.error(
+                                                new RuntimeException(err)
+                                        );
                                     });
                         }
 

@@ -232,7 +232,8 @@ public class MetadataHandlerServiceImpl implements MetadataHandlerService {
         return Flux.fromIterable(meta)
                 .flatMap(value ->
                                 ordaClient.deleteRequest(
-                                                String.format("%s/%s", endpoint, value.getFqn())
+                                                String.format("%s/%s", endpoint, value.getFqn()),
+                                                true
                                         )
                                         .doOnSuccess(response ->
                                                 log.info("Успешно удалено {}", value.getFqn())
@@ -280,7 +281,8 @@ public class MetadataHandlerServiceImpl implements MetadataHandlerService {
         return Flux.fromIterable(meta)
                 .flatMap(value ->
                                 ordaClient.deleteRequest(
-                                                String.format("%s/%s", endpoint, value.getFqn())
+                                                String.format("%s/%s", endpoint, value.getFqn()),
+                                                true // recursive
                                         )
                                         .doOnSuccess(response ->
                                                 log.info("Успешно удалено {}", value.getFqn())
@@ -377,7 +379,8 @@ public class MetadataHandlerServiceImpl implements MetadataHandlerService {
                 })
                 .flatMap(value ->
                                 ordaClient.deleteRequest(
-                                                String.format("%s/%s", endpoint, value.getFqn())
+                                                String.format("%s/%s", endpoint, value.getFqn()),
+                                                true // recursive
                                         )
                                         .doOnSuccess(response ->
                                                 log.info("Успешно удалено {}", value.getFqn())
