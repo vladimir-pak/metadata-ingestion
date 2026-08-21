@@ -22,6 +22,7 @@ import java.util.*;
 @Component
 @RequiredArgsConstructor
 @Slf4j
+@Deprecated(since = "Migrated to airflow handling via openmetadata-ingestion")
 public class ViewLineageRequestBuilder {
 
     private final ViewSqlLineageParser parser;

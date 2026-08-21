@@ -25,6 +25,7 @@ import java.util.*;
 
 @Component
 @Slf4j
+@Deprecated(since = "Migrated to airflow handling via openmetadata-ingestion")
 public final class ViewSqlLineageParser {
 
     public record TableRef(String schema, String name) {}

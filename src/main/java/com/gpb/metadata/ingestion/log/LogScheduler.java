@@ -1,6 +1,7 @@
 package com.gpb.metadata.ingestion.log;
 
 import com.gpb.metadata.ingestion.logrepository.LogPartitionRepository;
+import com.gpb.metadata.ingestion.repository.MetadataIngestionMetricRepository;
 import com.gpb.metadata.ingestion.service.CefLogFileService;
 
 import lombok.RequiredArgsConstructor;
@@ -14,6 +15,7 @@ import org.springframework.stereotype.Component;
 public class LogScheduler {
     private final SvoiCustomLogger svoiCustomLogger;
     private final LogPartitionRepository logPartitionRepository;
+    private final MetadataIngestionMetricRepository metadataMetricRepository;
     private final CefLogFileService cefLogger;
 
     @Scheduled(cron = "${logs-database.task-create-partition}")
@@ -36,5 +38,10 @@ public class LogScheduler {
                 "Cleaned old log files",
                 SvoiSeverityEnum.ONE
         );
+    }
+
+    @Scheduled(cron = "0 0 0 1 * ?")
+    public void createMetricPartition() {
+        metadataMetricRepository.createMetricPartition();
     }
 }

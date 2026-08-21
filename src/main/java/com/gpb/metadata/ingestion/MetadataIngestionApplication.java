@@ -5,6 +5,7 @@ import com.gpb.metadata.ingestion.log.SvoiSeverityEnum;
 import com.gpb.metadata.ingestion.logrepository.Log;
 import com.gpb.metadata.ingestion.logrepository.LogPartitionRepository;
 import com.gpb.metadata.ingestion.logrepository.LogRepository;
+import com.gpb.metadata.ingestion.repository.MetadataIngestionMetricRepository;
 import com.gpb.metadata.ingestion.utils.Utils;
 import jakarta.annotation.PostConstruct;
 import jakarta.annotation.PreDestroy;
@@ -32,12 +33,15 @@ import java.net.UnknownHostException;
 public class MetadataIngestionApplication {
 	private final SvoiCustomLogger svoiCustomLogger;
 	private final LogPartitionRepository logPartitionRepository;
+	private final MetadataIngestionMetricRepository metadataMetricRepository;
 	private final LogRepository logRepository;
 	private final ConfigurableEnvironment configurableEnvironment;
 	private static ConfigurableApplicationContext applicationContext;
+	
 	@PostConstruct
 	public void startupApplication() {
 		logPartitionRepository.createTodayPartition();
+		metadataMetricRepository.createMetricPartition();
 		svoiCustomLogger.sendInternal("startService", "Start Service", "Started service", SvoiSeverityEnum.ONE);
 
 		checkConfigChanges();

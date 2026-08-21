@@ -33,25 +33,41 @@ public class CacheController {
     @PostMapping("/start/postgres")
     public ResponseEntity<String> startPostgres(@RequestBody RequestBodyDto body, HttpServletRequest request) {
         logger.logApiCall(request, "startIngestionPostgres", body);
-        return startInternal(schemasProperties.getPostgres(), body.getServiceName());
+        return startInternal(
+            schemasProperties.getPostgres(), 
+            body.getServiceName(),
+            body.isAsync()
+        );
     }
 
     @PostMapping("/start/oracle")
     public ResponseEntity<String> startOracle(@RequestBody RequestBodyDto body, HttpServletRequest request) {
         logger.logApiCall(request, "startIngestionOracle", body);
-        return startInternal(schemasProperties.getOracle(), body.getServiceName());
+        return startInternal(
+            schemasProperties.getOracle(), 
+            body.getServiceName(),
+            body.isAsync()
+        );
     }
 
     @PostMapping("/start/mssql")
     public ResponseEntity<String> startMssql(@RequestBody RequestBodyDto body, HttpServletRequest request) {
         logger.logApiCall(request, "startIngestionMssql", body);
-        return startInternal(schemasProperties.getMssql(), body.getServiceName());
+        return startInternal(
+            schemasProperties.getMssql(), 
+            body.getServiceName(),
+            body.isAsync()
+        );
     }
 
     @PostMapping("/start/sapiq")
     public ResponseEntity<String> startSapIq(@RequestBody RequestBodyDto body, HttpServletRequest request) {
         logger.logApiCall(request, "startIngestionSapIq", body);
-        return startInternal(schemasProperties.getSapiq(), body.getServiceName());
+        return startInternal(
+            schemasProperties.getSapiq(), 
+            body.getServiceName(),
+            body.isAsync()
+        );
     }
 
     @DeleteMapping("/clean/{schema}")
@@ -67,9 +83,17 @@ public class CacheController {
         );
     }
 
-    private ResponseEntity<String> startInternal(String schema, String serviceName) {
+    private ResponseEntity<String> startInternal(
+        String schema, 
+        String serviceName,
+        boolean async
+    ) {
         try {
-            metadataHandlerService.startAsync(schema, serviceName);
+            if (async) {
+                metadataHandlerService.startAsync(schema, serviceName);
+            } else {
+                metadataHandlerService.start(schema, serviceName);
+            }
             return ResponseEntity.ok(
                     String.format("Ingestion for %s from schema %s starting", serviceName, schema)
             );
