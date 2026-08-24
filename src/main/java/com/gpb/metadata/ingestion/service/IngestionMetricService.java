@@ -1,12 +1,12 @@
 package com.gpb.metadata.ingestion.service;
 
-import java.time.LocalDateTime;
+import java.util.UUID;
 import java.util.function.Function;
 
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
-import com.gpb.metadata.ingestion.enums.IngestionMetricJob;
+import com.gpb.metadata.ingestion.metrics.enums.IngestionMetricJob;
 import com.gpb.metadata.ingestion.metrics.MetricCounter;
 import com.gpb.metadata.ingestion.repository.MetadataIngestionMetricRepository;
 
@@ -18,57 +18,121 @@ import lombok.extern.slf4j.Slf4j;
 @Slf4j
 public class IngestionMetricService {
 
-    private final MetadataIngestionMetricRepository metricRepository;
+    private final MetadataIngestionMetricRepository repository;
 
     @Value("${spring.application.name:metadata-ingestion}")
     private String appName;
 
+    /**
+     * Создаёт новый ingestion run и сразу
+     * регистрирует все этапы как QUEUE.
+     */
+    public String createRun(String serviceName) {
+
+        String runId = UUID.randomUUID().toString();
+
+        repository.createQueuedJobs(
+                runId,
+                serviceName,
+                appName
+        );
+
+        log.info(
+                "Created ingestion run. runId={}, serviceName={}",
+                runId,
+                serviceName
+        );
+
+        return runId;
+    }
+
+    /**
+     * Выполняет отдельный job:
+     * QUEUE -> RUNNING -> DONE
+     *
+     * либо:
+     * QUEUE -> RUNNING -> FAILED
+     */
     public <T> T execute(
-            String serviceName,
-            IngestionMetricJob jobName,
+            String runId,
+            IngestionMetricJob job,
             Function<MetricCounter, T> action) {
 
-        LocalDateTime startDttm = LocalDateTime.now();
         MetricCounter counter = new MetricCounter();
 
+        repository.markRunning(runId,job);
+
+        log.info(
+                "Ingestion job started. runId={}, job={}",
+                runId,
+                job
+        );
+
         try {
-            return action.apply(counter);
-        } finally {
-            LocalDateTime endDttm = LocalDateTime.now();
+
+            T result = action.apply(counter);
+
+            repository.markDone(runId, job, counter);
+
+            log.info(
+                    "Ingestion job completed. " +
+                    "runId={}, job={}, successCount={}, errorCount={}",
+                    runId,
+                    job,
+                    counter.getSuccessCount(),
+                    counter.getErrorCount()
+            );
+
+            return result;
+
+        } catch (RuntimeException e) {
 
             try {
-                metricRepository.save(
-                        serviceName,
-                        jobName,
-                        counter.getSuccessCount(),
-                        counter.getErrorCount(),
-                        startDttm,
-                        endDttm,
-                        appName
-                );
 
-                log.info(
-                        "Metric saved. serviceName={}, jobName={}, success={}, errors={}, start={}, end={}",
-                        serviceName,
-                        jobName,
-                        counter.getSuccessCount(),
-                        counter.getErrorCount(),
-                        startDttm,
-                        endDttm
-                );
+                repository.markFailed(runId, job, counter);
 
-            } catch (Exception e) {
+            } catch (RuntimeException metricException) {
+
                 /*
-                 * Ошибка сохранения метрики не должна маскировать
-                 * ошибку основного ingestion.
+                 * Не маскируем первоначальную ошибку ingestion.
                  */
+                e.addSuppressed(metricException);
+
                 log.error(
-                        "Failed to save ingestion metric. serviceName={}, jobName={}",
-                        serviceName,
-                        jobName,
-                        e
+                        "Failed to update ingestion job status to FAILED. " +
+                        "runId={}, job={}",
+                        runId,
+                        job,
+                        metricException
                 );
             }
+
+            log.error(
+                    "Ingestion job failed. " +
+                    "runId={}, job={}, successCount={}, errorCount={}",
+                    runId,
+                    job,
+                    counter.getSuccessCount(),
+                    counter.getErrorCount(),
+                    e
+            );
+
+            throw e;
         }
+    }
+
+    /**
+     * Все ещё не запущенные процессы переводим
+     * из QUEUE в SKIPPED.
+     */
+    public void skipRemaining(String runId) {
+
+        int skipped = repository.markQueuedAsSkipped(runId);
+
+        log.info(
+                "Skipped remaining ingestion jobs. runId={}, count={}",
+                runId,
+                skipped
+        );
     }
 }

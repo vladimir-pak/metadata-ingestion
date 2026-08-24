@@ -42,14 +42,14 @@ public class OrdaClient {
                         Mono.defer(() -> request.apply(token))
                                 .onErrorResume(OrdaAuthException.class, firstAuthError ->
                                         Mono.fromCallable(() ->
-                                                        tokenProvider.refreshAfterUnauthorized(token)
+                                                    tokenProvider.refreshAfterUnauthorized(token)
                                                 )
                                                 .subscribeOn(Schedulers.boundedElastic())
                                                 .flatMap(refreshedToken ->
                                                         Mono.defer(() -> request.apply(refreshedToken))
                                                                 .onErrorMap(
-                                                                        OrdaAuthException.class,
-                                                                        TokenRefreshException::new
+                                                                    OrdaAuthException.class,
+                                                                    TokenRefreshException::new
                                                                 )
                                                 )
                                 )

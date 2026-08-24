@@ -1,6 +1,15 @@
 package com.gpb.metadata.ingestion.service;
 
 public interface MetadataHandlerService {
-    public void startAsync(String schemaName ,String serviceName);
-    public void start(String schemaName ,String serviceName);
+    void start(
+            String schemaName,
+            String serviceName,
+            String runId
+    );
+
+    void startAsync(
+            String schemaName,
+            String serviceName,
+            String runId
+    );
 }

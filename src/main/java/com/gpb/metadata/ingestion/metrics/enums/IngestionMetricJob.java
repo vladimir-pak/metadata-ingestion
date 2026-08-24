@@ -1,10 +1,10 @@
-package com.gpb.metadata.ingestion.enums;
+package com.gpb.metadata.ingestion.metrics.enums;
 
 public enum IngestionMetricJob {
     DATABASE_UPSERT,
     SCHEMA_UPSERT,
     TABLE_UPSERT,
-    DATABASE_DELETE,
+    TABLE_DELETE,
     SCHEMA_DELETE,
-    TABLE_DELETE
+    DATABASE_DELETE
 }

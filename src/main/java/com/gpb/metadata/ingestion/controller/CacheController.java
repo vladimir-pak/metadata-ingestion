@@ -14,21 +14,25 @@ import org.springframework.web.bind.annotation.RestController;
 
 import com.gpb.metadata.ingestion.dto.RequestBodyDto;
 import com.gpb.metadata.ingestion.service.CacheService;
+import com.gpb.metadata.ingestion.service.IngestionMetricService;
 import com.gpb.metadata.ingestion.service.MetadataHandlerService;
 
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 
 @RestController
 @RequestMapping("/api/ingestion")
 @RequiredArgsConstructor
 @Tag(name = "ingestion", description = "API запуска приема метаданных")
+@Slf4j
 public class CacheController {
 
     private final MetadataHandlerService metadataHandlerService;
     private final MetadataSchemasProperties schemasProperties;
     private final CacheService cacheService;
     private final SvoiCustomLogger logger;
+    private final IngestionMetricService ingestionMetricService;
 
     @PostMapping("/start/postgres")
     public ResponseEntity<String> startPostgres(@RequestBody RequestBodyDto body, HttpServletRequest request) {
@@ -84,25 +88,74 @@ public class CacheController {
     }
 
     private ResponseEntity<String> startInternal(
-        String schema, 
-        String serviceName,
-        boolean async
-    ) {
+            String schema,
+            String serviceName,
+            boolean async) {
+
+        String runId = null;
         try {
+            /*
+            * Здесь появляются:
+            * DATABASE_UPSERT QUEUE
+            * SCHEMA_UPSERT   QUEUE
+            * TABLE_UPSERT    QUEUE
+            * TABLE_DELETE    QUEUE
+            * SCHEMA_DELETE   QUEUE
+            * DATABASE_DELETE QUEUE
+            */
+            runId = ingestionMetricService.createRun(serviceName);
+
             if (async) {
-                metadataHandlerService.startAsync(schema, serviceName);
+                metadataHandlerService.startAsync(
+                        schema,
+                        serviceName,
+                        runId
+                );
             } else {
-                metadataHandlerService.start(schema, serviceName);
+                metadataHandlerService.start(
+                        schema,
+                        serviceName,
+                        runId
+                );
             }
+
             return ResponseEntity.ok(
-                    String.format("Ingestion for %s from schema %s starting", serviceName, schema)
+                    String.format(
+                            "Ingestion run %s for %s from schema %s started",
+                            runId,
+                            serviceName,
+                            schema
+                    )
             );
         } catch (IllegalArgumentException e) {
-            return ResponseEntity.badRequest().body(e.getMessage());
+            if (runId != null) {
+                skipSafely(runId);
+            }
+            return ResponseEntity
+                    .badRequest()
+                    .body(e.getMessage());
         } catch (Exception e) {
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                    .body("Failed to start replication: " + e.getMessage());
+            if (runId != null) {
+                skipSafely(runId);
+            }
+            return ResponseEntity
+                    .status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(
+                            "Failed to start replication: "
+                            + e.getMessage()
+                    );
         }
     }
 
+    private void skipSafely(String runId) {
+        try {
+            ingestionMetricService.skipRemaining(runId);
+        } catch (Exception e) {
+            log.error(
+                    "Failed to mark ingestion jobs as SKIPPED. runId={}",
+                    runId,
+                    e
+            );
+        }
+    }
 }
