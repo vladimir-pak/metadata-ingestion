@@ -6,5 +6,6 @@ public enum IngestionMetricJob {
     TABLE_UPSERT,
     TABLE_DELETE,
     SCHEMA_DELETE,
-    DATABASE_DELETE
+    DATABASE_DELETE,
+    VIEW_PARSING
 }

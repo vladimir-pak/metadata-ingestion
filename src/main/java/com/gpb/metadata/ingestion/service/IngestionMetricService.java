@@ -121,6 +121,23 @@ public class IngestionMetricService {
         }
     }
 
+    public void createViewParsingJob(
+            String runId,
+            String serviceName) {
+
+        repository.createViewParsingJob(
+                runId,
+                serviceName,
+                appName
+        );
+
+        log.info(
+                "Created VIEW_PARSING job. runId={}, serviceName={}",
+                runId,
+                serviceName
+        );
+    }
+
     /**
      * Все ещё не запущенные процессы переводим
      * из QUEUE в SKIPPED.

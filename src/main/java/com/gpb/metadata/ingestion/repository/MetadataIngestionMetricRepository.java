@@ -47,6 +47,7 @@ public class MetadataIngestionMetricRepository {
             String appName) {
 
         List<Object[]> batchArgs = Arrays.stream(IngestionMetricJob.values())
+                .filter(job -> job != IngestionMetricJob.VIEW_PARSING)
                 .map(job -> new Object[]{
                         runId,
                         job.name(),
@@ -204,6 +205,24 @@ public class MetadataIngestionMetricRepository {
                     )
             );
         }
+    }
+
+    /**
+     * Создание задачи на парсинг представлений
+     */
+    public void createViewParsingJob(
+            String runId,
+            String serviceName,
+            String appName) {
+
+        jdbcTemplate.update(
+                INSERT_JOB,
+                runId,
+                IngestionMetricJob.VIEW_PARSING.name(),
+                appName,
+                IngestionStatus.QUEUE.name(),
+                serviceName
+        );
     }
 
     /**
