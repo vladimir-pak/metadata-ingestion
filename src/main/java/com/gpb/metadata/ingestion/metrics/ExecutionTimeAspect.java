@@ -17,6 +17,7 @@ public class ExecutionTimeAspect {
             "!within(com.gpb.metadata.ingestion.service.KeycloakAuthService) && " +
             "!within(com.gpb.metadata.ingestion.service.CustomAuthenticationEntryPoint) && " +
             "!within(com.gpb.metadata.ingestion.service.OrdaTokenProvider) && " +
+            "!within(com.gpb.metadata.ingestion.service.IngestionMetricService) && " +
             "!within(com.gpb.metadata.ingestion.service.CustomUserDetailsService)")
     public Object logExecutionTime(ProceedingJoinPoint joinPoint) throws Throwable {
         long startTime = System.currentTimeMillis();

@@ -14,14 +14,15 @@ import com.gpb.metadata.ingestion.metrics.MetricCounter;
 import com.gpb.metadata.ingestion.metrics.enums.IngestionMetricJob;
 import com.gpb.metadata.ingestion.metrics.enums.IngestionStatus;
 
-import lombok.RequiredArgsConstructor;
-
 @Repository
-@RequiredArgsConstructor
 public class MetadataIngestionMetricRepository {
 
-    @Qualifier("jdbcTemplate")
     private final JdbcTemplate jdbcTemplate;
+
+    public MetadataIngestionMetricRepository(
+            @Qualifier("jdbcTemplate") JdbcTemplate jdbcTemplate) {
+        this.jdbcTemplate = jdbcTemplate;
+    }
 
     private static final String INSERT_JOB = """
             INSERT INTO public.metadata_ingestion (
