@@ -371,8 +371,10 @@ public class MetadataHandlerServiceImpl implements MetadataHandlerService {
                 }
         );
 
-        // Создаем задачу на парсинг view
-        ingestionMetricService.createViewParsingJob(runId, serviceName);
+        if (!tableContext.cache.getPutRecords().isEmpty()) {
+            // Создаем задачу на парсинг view
+            ingestionMetricService.createViewParsingJob(runId, serviceName);
+        }
     }
 
     private ServiceType resolveServiceType(
