@@ -1,15 +1,18 @@
 package com.gpb.metadata.ingestion.properties;
 
-import lombok.Getter;
-import lombok.Setter;
+import lombok.Data;
+
+import java.nio.file.Path;
+import java.nio.file.Paths;
+
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.stereotype.Component;
 
-@Getter
-@Setter
+@Data
 @Component
 @ConfigurationProperties(prefix = "logging.cef")
 public class CefLoggingProperties {
-    private String path = "logs/cef.log";
+    private Path path = Paths.get("logs");
+    private String fileName = "cef.log";
     private int retentionDays = 30;
 }

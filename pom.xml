@@ -117,6 +117,12 @@
             <version>2.3.0</version>
         </dependency>
 
+		<dependency>
+			<groupId>org.apache.commons</groupId>
+			<artifactId>commons-compress</artifactId>
+			<version>1.26.1</version>
+		</dependency>
+
 		<!-- Указание точных версий без уязвимостей -->
         <dependency>
             <groupId>io.netty</groupId>
