@@ -83,7 +83,7 @@ public class CacheController {
         logger.logApiCall(request, "cleanCache", body);
         cacheService.cleanCache(schema, body.getServiceName());
         return ResponseEntity.ok(
-                String.format("Cache for %s from schema %s finished", body.getServiceName(), schema)
+            String.format("Cache for %s from schema %s finished", body.getServiceName(), schema)
         );
     }
 
@@ -102,29 +102,33 @@ public class CacheController {
             * TABLE_DELETE    QUEUE
             * SCHEMA_DELETE   QUEUE
             * DATABASE_DELETE QUEUE
+            * 
+            * Атомарная операция:
+            * advisory lock -> active check -> create QUEUE jobs
             */
-            runId = ingestionMetricService.createRun(serviceName);
+            runId = ingestionMetricService
+                    .createRunIfNotExecuting(serviceName);
 
             if (async) {
                 metadataHandlerService.startAsync(
-                        schema,
-                        serviceName,
-                        runId
+                    schema,
+                    serviceName,
+                    runId
                 );
             } else {
                 metadataHandlerService.start(
-                        schema,
-                        serviceName,
-                        runId
+                    schema,
+                    serviceName,
+                    runId
                 );
             }
 
             return ResponseEntity.ok(
                     String.format(
-                            "Ingestion run %s for %s from schema %s started",
-                            runId,
-                            serviceName,
-                            schema
+                        "Ingestion run %s for %s from schema %s started",
+                        runId,
+                        serviceName,
+                        schema
                     )
             );
         } catch (IllegalArgumentException e) {
@@ -141,8 +145,8 @@ public class CacheController {
             return ResponseEntity
                     .status(HttpStatus.INTERNAL_SERVER_ERROR)
                     .body(
-                            "Failed to start replication: "
-                            + e.getMessage()
+                        "Failed to start replication: "
+                        + e.getMessage()
                     );
         }
     }
@@ -152,9 +156,9 @@ public class CacheController {
             ingestionMetricService.skipRemaining(runId);
         } catch (Exception e) {
             log.error(
-                    "Failed to mark ingestion jobs as SKIPPED. runId={}",
-                    runId,
-                    e
+                "Failed to mark ingestion jobs as SKIPPED. runId={}",
+                runId,
+                e
             );
         }
     }

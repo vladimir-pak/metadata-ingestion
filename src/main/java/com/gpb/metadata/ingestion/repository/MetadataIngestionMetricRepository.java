@@ -21,6 +21,7 @@ public class MetadataIngestionMetricRepository {
 
     public MetadataIngestionMetricRepository(
             @Qualifier("jdbcTemplate") JdbcTemplate jdbcTemplate) {
+
         this.jdbcTemplate = jdbcTemplate;
     }
 
@@ -38,24 +39,88 @@ public class MetadataIngestionMetricRepository {
             """;
 
     /**
-     * Создаём все процессы конкретного ingestion
+     * Берём transaction-level advisory lock для serviceName.
+     * Lock существует только до конца текущей транзакции.
+     * Для одного serviceName одновременно только одна транзакция
+     * сможет пройти дальше.
+     */
+    public void lockService(String serviceName) {
+
+        jdbcTemplate.query(
+                """
+                SELECT pg_advisory_xact_lock(
+                    hashtext('metadata-ingestion'),
+                    hashtext(?)
+                )
+                """,
+                ps -> ps.setString(
+                        1,
+                        serviceName
+                ),
+                rs -> null
+        );
+    }
+
+    /**
+     * Проверяем наличие активного основного ingestion.
+     *
+     * VIEW_PARSING здесь намеренно исключён:
+     * он выполняется другим сервисом и не должен блокировать
+     * следующий metadata ingestion.
+     */
+    public boolean isExecuting(
+            String serviceName,
+            String appName) {
+
+        Boolean exists = jdbcTemplate.queryForObject(
+                """
+                SELECT EXISTS (
+                    SELECT 1
+                    FROM public.metadata_ingestion
+                    WHERE service_name = ?
+                      AND appname = ?
+                      AND job_name <> ?
+                      AND status IN (?, ?)
+                )
+                """,
+                Boolean.class,
+                serviceName,
+                appName,
+                IngestionMetricJob.VIEW_PARSING.name(),
+                IngestionStatus.QUEUE.name(),
+                IngestionStatus.RUNNING.name()
+        );
+
+        return Boolean.TRUE.equals(exists);
+    }
+
+    /**
+     * Создаём все основные процессы конкретного ingestion
      * сразу со статусом QUEUE.
+     * VIEW_PARSING создаётся отдельно после завершения ingestion.
      */
     public void createQueuedJobs(
             String runId,
             String serviceName,
             String appName) {
 
-        List<Object[]> batchArgs = Arrays.stream(IngestionMetricJob.values())
-                .filter(job -> job != IngestionMetricJob.VIEW_PARSING)
-                .map(job -> new Object[]{
-                        runId,
-                        job.name(),
-                        appName,
-                        IngestionStatus.QUEUE.name(),
-                        serviceName
-                })
-                .toList();
+        List<Object[]> batchArgs =
+                Arrays.stream(IngestionMetricJob.values())
+                        .filter(
+                                job ->
+                                        job
+                                                != IngestionMetricJob.VIEW_PARSING
+                        )
+                        .map(
+                                job -> new Object[]{
+                                        runId,
+                                        job.name(),
+                                        appName,
+                                        IngestionStatus.QUEUE.name(),
+                                        serviceName
+                                }
+                        )
+                        .toList();
 
         jdbcTemplate.batchUpdate(
                 INSERT_JOB,
@@ -164,14 +229,12 @@ public class MetadataIngestionMetricRepository {
     }
 
     /**
-     * После аварийного завершения текущего этапа:
+     * Все jobs, которые ещё не стартовали:
      *
-     * все процессы, которые ещё даже не стартовали,
-     * QUEUE -> SKIPPED.
-     *
-     * start_dttm остаётся NULL, потому что job не запускался.
+     * QUEUE -> SKIPPED
      */
-    public int markQueuedAsSkipped(String runId) {
+    public int markQueuedAsSkipped(
+            String runId) {
 
         return jdbcTemplate.update(
                 """
@@ -187,28 +250,9 @@ public class MetadataIngestionMetricRepository {
         );
     }
 
-    private void checkSingleUpdate(
-            int updated,
-            String runId,
-            IngestionMetricJob job,
-            IngestionStatus targetStatus) {
-
-        if (updated != 1) {
-            throw new IllegalStateException(
-                    String.format(
-                            "Cannot change ingestion status. " +
-                            "runId=%s, job=%s, targetStatus=%s, updated=%d",
-                            runId,
-                            job,
-                            targetStatus,
-                            updated
-                    )
-            );
-        }
-    }
-
     /**
-     * Создание задачи на парсинг представлений
+     * VIEW_PARSING создаётся после успешного завершения
+     * основного ingestion.
      */
     public void createViewParsingJob(
             String runId,
@@ -225,33 +269,70 @@ public class MetadataIngestionMetricRepository {
         );
     }
 
+    private void checkSingleUpdate(
+            int updated,
+            String runId,
+            IngestionMetricJob job,
+            IngestionStatus targetStatus) {
+
+        if (updated != 1) {
+
+            throw new IllegalStateException(
+                    String.format(
+                            "Cannot change ingestion status. " +
+                            "runId=%s, job=%s, " +
+                            "targetStatus=%s, updated=%d",
+                            runId,
+                            job,
+                            targetStatus,
+                            updated
+                    )
+            );
+        }
+    }
+
     /**
-     * Создание партиции
+     * Создание месячной партиции.
      */
     public void createMetricPartition() {
-        String table = "public.metadata_ingestion";
 
-        YearMonth currentMonth = YearMonth.now();
+        String table =
+                "public.metadata_ingestion";
 
-        String partitionName = String.format(
-                "public.metadata_ingestion_%s",
-                currentMonth.format(DateTimeFormatter.ofPattern("yyyy_MM"))
-        );
+        YearMonth currentMonth =
+                YearMonth.now();
 
-        LocalDate from = currentMonth.atDay(1);
-        LocalDate to = currentMonth.plusMonths(1).atDay(1);
+        String partitionName =
+                String.format(
+                        "public.metadata_ingestion_%s",
+                        currentMonth.format(
+                                DateTimeFormatter.ofPattern(
+                                        "yyyy_MM"
+                                )
+                        )
+                );
 
-        String sql = String.format("""
-                CREATE TABLE IF NOT EXISTS %s
-                PARTITION OF %s
-                FOR VALUES FROM ('%s 00:00:00')
-                        TO ('%s 00:00:00')
-                """,
-                partitionName,
-                table,
-                from,
-                to
-        );
+        LocalDate from =
+                currentMonth.atDay(1);
+
+        LocalDate to =
+                currentMonth
+                        .plusMonths(1)
+                        .atDay(1);
+
+        String sql =
+                String.format(
+                        """
+                        CREATE TABLE IF NOT EXISTS %s
+                        PARTITION OF %s
+                        FOR VALUES FROM ('%s 00:00:00')
+                                 TO ('%s 00:00:00')
+                        """,
+                        partitionName,
+                        table,
+                        from,
+                        to
+                );
 
         jdbcTemplate.execute(sql);
     }

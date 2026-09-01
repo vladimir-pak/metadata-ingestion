@@ -59,6 +59,8 @@ ignite:
     walArchivePath: ./ignite/wal-archive
     
 ord:
+  delete:
+    threshold: 70
   datasource:
     url: ${DB_URL:jdbc:postgresql://localhost:5432/meta_base}
     username: ${DB_USER:postgres}

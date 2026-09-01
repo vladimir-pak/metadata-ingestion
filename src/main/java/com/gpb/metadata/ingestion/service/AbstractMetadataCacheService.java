@@ -11,13 +11,16 @@ import org.apache.ignite.cache.CacheMode;
 import org.apache.ignite.cache.query.ScanQuery;
 import org.apache.ignite.configuration.CacheConfiguration;
 import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.beans.factory.annotation.Value;
 
 import com.gpb.metadata.ingestion.cache.CacheComparisonResult;
 import com.gpb.metadata.ingestion.enums.DbObjectType;
+import com.gpb.metadata.ingestion.exceptions.DeleteThresholdExceededException;
 import com.gpb.metadata.ingestion.model.EntityId;
 import com.gpb.metadata.ingestion.model.Metadata;
 import com.gpb.metadata.ingestion.repository.MetadataRepository;
 
+import jakarta.annotation.PostConstruct;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 
@@ -33,6 +36,9 @@ public abstract class AbstractMetadataCacheService<T extends Metadata> {
     protected final Map<String, IgniteCache<EntityId, T>> runtimeCaches = new ConcurrentHashMap<>();
     protected final String TEMP_CACHE_PREFIX = "temp_%s_";
     protected final String CACHE_NAME = "runtime_%s_";
+
+    @Value("${ord.delete.threshold:70}")
+    protected int deleteThreshold;
 
     /**
      * Получить или создать runtime кэш по serviceName + schemaName
@@ -80,22 +86,70 @@ public abstract class AbstractMetadataCacheService<T extends Metadata> {
     /**
      * Сравнить runtime кэш с временным (из БД) и найти изменения
      */
-    protected CacheComparisonResult<T> compareCaches(String schemaName, String serviceName) {
-        IgniteCache<EntityId, T> runtimeCache = getOrCreateRuntimeCache(schemaName, serviceName);
-        IgniteCache<EntityId, T> tempCache = createTempCacheFromDatabase(schemaName, serviceName);
+    protected CacheComparisonResult<T> compareCaches(
+            String schemaName,
+            String serviceName) {
+
+        IgniteCache<EntityId, T> runtimeCache =
+                getOrCreateRuntimeCache(schemaName, serviceName);
+
+        IgniteCache<EntityId, T> tempCache =
+                createTempCacheFromDatabase(schemaName, serviceName);
 
         try {
-            CacheComparisonResult<T> result = new CacheComparisonResult<>();
+            CacheComparisonResult<T> result =
+                    new CacheComparisonResult<>();
 
-            findNewRecords(runtimeCache, tempCache, result);
-            findModifiedRecords(runtimeCache, tempCache, result);
-            findDeletedRecords(runtimeCache, tempCache, result);
+            Set<EntityId> runtimeKeys =
+                    getAllKeys(runtimeCache);
 
-            log.info("Comparison result for {} (schema={}): newRecords={}, modifiedRecords={}, deletedRecords={}",
+            Set<EntityId> tempKeys =
+                    getAllKeys(tempCache);
+
+            findNewRecords(
+                    runtimeCache,
+                    tempCache,
+                    runtimeKeys,
+                    tempKeys,
+                    result
+            );
+
+            findModifiedRecords(
+                    runtimeCache,
+                    tempCache,
+                    runtimeKeys,
+                    tempKeys,
+                    result
+            );
+
+            findDeletedRecords(
+                    runtimeCache,
+                    runtimeKeys,
+                    tempKeys,
+                    result
+            );
+
+            log.info(
+                    "Comparison result for {} (schema={}, service={}): " +
+                    "previousCount={}, currentCount={}, " +
+                    "newRecords={}, modifiedRecords={}, deletedRecords={}",
                     dbObjectTypeType.getName(),
                     schemaName,
+                    serviceName,
+                    runtimeKeys.size(),
+                    tempKeys.size(),
                     result.getNewRecords().size(),
                     result.getModifiedRecords().size(),
+                    result.getDeletedRecords().size()
+            );
+
+            /*
+            * ВАЖНО:
+            * проверяем ДО updateRuntimeCache().
+            */
+            validateDeleteThreshold(
+                    serviceName,
+                    runtimeKeys.size(),
                     result.getDeletedRecords().size()
             );
 
@@ -128,57 +182,112 @@ public abstract class AbstractMetadataCacheService<T extends Metadata> {
     /**
      * Полная синхронизация: сравнить и обновить
      */
-    public CacheComparisonResult<T> synchronizeWithDatabase(String schemaName, String serviceName) {
-        CacheComparisonResult<T> changes = compareCaches(schemaName, serviceName);
-        updateRuntimeCache(schemaName, serviceName, changes);
+    public CacheComparisonResult<T> synchronizeWithDatabase(
+            String schemaName,
+            String serviceName) {
+        /*
+        * compareCaches внутри выполняет threshold validation.
+        * Если threshold превышен,
+        * отсюда будет выброшено исключение.
+        */
+        CacheComparisonResult<T> changes =
+                compareCaches(
+                        schemaName,
+                        serviceName
+                );
+
+        /*
+        * Сюда мы попадём ТОЛЬКО если validation прошёл.
+        */
+        updateRuntimeCache(
+                schemaName,
+                serviceName,
+                changes
+        );
+
         return changes;
     }
 
-    private void findNewRecords(IgniteCache<EntityId, T> runtimeCache,
-                                IgniteCache<EntityId, T> tempCache,
-                                CacheComparisonResult<T> result) {
-        Set<EntityId> tempKeys = getAllKeys(tempCache);
-        Set<EntityId> runtimeKeys = getAllKeys(runtimeCache);
+    private void findNewRecords(
+            IgniteCache<EntityId, T> runtimeCache,
+            IgniteCache<EntityId, T> tempCache,
+            Set<EntityId> runtimeKeys,
+            Set<EntityId> tempKeys,
+            CacheComparisonResult<T> result) {
 
-        tempKeys.removeAll(runtimeKeys);
+        Set<EntityId> newKeys =
+                new HashSet<>(tempKeys);
 
-        for (EntityId key : tempKeys) {
+        newKeys.removeAll(runtimeKeys);
+
+        for (EntityId key : newKeys) {
             T tempData = tempCache.get(key);
+
             if (tempData != null) {
-                result.addNewRecord(key, tempData);
+                result.addNewRecord(
+                        key,
+                        tempData
+                );
             }
         }
     }
 
-    private void findModifiedRecords(IgniteCache<EntityId, T> runtimeCache,
-                                     IgniteCache<EntityId, T> tempCache,
-                                     CacheComparisonResult<T> result) {
-        Set<EntityId> commonKeys = new HashSet<>(getAllKeys(runtimeCache));
-        commonKeys.retainAll(getAllKeys(tempCache));
+    private void findModifiedRecords(
+            IgniteCache<EntityId, T> runtimeCache,
+            IgniteCache<EntityId, T> tempCache,
+            Set<EntityId> runtimeKeys,
+            Set<EntityId> tempKeys,
+            CacheComparisonResult<T> result) {
+
+        Set<EntityId> commonKeys =
+                new HashSet<>(runtimeKeys);
+
+        commonKeys.retainAll(tempKeys);
 
         for (EntityId key : commonKeys) {
-            T runtimeData = runtimeCache.get(key);
-            T tempData = tempCache.get(key);
 
-            if (runtimeData != null && tempData != null &&
-                    !Objects.equals(runtimeData.getHashData(), tempData.getHashData())) {
-                result.addModifiedRecord(key, tempData);
+            T runtimeData =
+                    runtimeCache.get(key);
+
+            T tempData =
+                    tempCache.get(key);
+
+            if (runtimeData != null
+                    && tempData != null
+                    && !Objects.equals(
+                            runtimeData.getHashData(),
+                            tempData.getHashData()
+                    )) {
+
+                result.addModifiedRecord(
+                        key,
+                        tempData
+                );
             }
         }
     }
 
-    private void findDeletedRecords(IgniteCache<EntityId, T> runtimeCache,
-                                    IgniteCache<EntityId, T> tempCache,
-                                    CacheComparisonResult<T> result) {
-        Set<EntityId> runtimeKeys = getAllKeys(runtimeCache);
-        Set<EntityId> tempKeys = getAllKeys(tempCache);
+    private void findDeletedRecords(
+            IgniteCache<EntityId, T> runtimeCache,
+            Set<EntityId> runtimeKeys,
+            Set<EntityId> tempKeys,
+            CacheComparisonResult<T> result) {
 
-        runtimeKeys.removeAll(tempKeys);
+        Set<EntityId> deletedKeys =
+                new HashSet<>(runtimeKeys);
 
-        for (EntityId key : runtimeKeys) {
-            T runtimeData = runtimeCache.get(key);
+        deletedKeys.removeAll(tempKeys);
+
+        for (EntityId key : deletedKeys) {
+
+            T runtimeData =
+                    runtimeCache.get(key);
+
             if (runtimeData != null) {
-                result.addDeletedRecord(key, runtimeData);
+                result.addDeletedRecord(
+                        key,
+                        runtimeData
+                );
             }
         }
     }
@@ -203,6 +312,88 @@ public abstract class AbstractMetadataCacheService<T extends Metadata> {
 
         if (ignite.cache(cacheName) != null) {  // проверка существования
             ignite.destroyCache(cacheName);
+        }
+    }
+
+    private void validateDeleteThreshold(
+            String serviceName,
+            int previousCount,
+            int deleteCount) {
+
+        /*
+        * Защиту применяем только к TABLE и SCHEMA.
+        */
+        if (dbObjectTypeType != DbObjectType.TABLE
+                && dbObjectTypeType != DbObjectType.SCHEMA) {
+            return;
+        }
+
+        /*
+        * Первый запуск.
+        *
+        * Runtime cache ещё пустой, поэтому вычислять процент
+        * удаления не относительно чего.
+        */
+        if (previousCount == 0) {
+            return;
+        }
+
+        /*
+        * Ничего не удаляется.
+        */
+        if (deleteCount == 0) {
+            return;
+        }
+
+        double deletePercent =
+                ((double) deleteCount / previousCount) * 100.0;
+
+        log.info(
+                "Delete threshold validation. " +
+                "DbService=\"{}\", objectType={}, " +
+                "previousCount={}, deleteCount={}, " +
+                "deletePercent={}%, threshold={}%",
+                serviceName,
+                dbObjectTypeType.name(),
+                previousCount,
+                deleteCount,
+                String.format("%.2f", deletePercent),
+                deleteThreshold
+        );
+
+        if (deletePercent <= deleteThreshold) {
+            return;
+        }
+
+        String message = String.format(
+                "Potential false mass deletion detected. " +
+                "DbService=\"%s\", objectType=%s, " +
+                "previousCount=%d, deleteCount=%d, " +
+                "deletePercent=%.2f%%, threshold=%d%%. " +
+                "Runtime cache will not be updated.",
+                serviceName,
+                dbObjectTypeType.name(),
+                previousCount,
+                deleteCount,
+                deletePercent,
+                deleteThreshold
+        );
+
+        log.error(message);
+
+        throw new DeleteThresholdExceededException(message);
+    }
+
+    @PostConstruct
+    public void validateConfiguration() {
+
+        if (deleteThreshold < 0
+                || deleteThreshold > 100) {
+
+            throw new IllegalStateException(
+                    "ord.delete.threshold must be between 0 and 100, actual="
+                    + deleteThreshold
+            );
         }
     }
 
