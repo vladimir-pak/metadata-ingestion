@@ -20,7 +20,9 @@ public class TableMetadataCacheRepository implements MetadataRepository<TableMet
 
     public TableMetadataCacheRepository(@Qualifier("jdbcTemplate") JdbcTemplate jdbcTemplate) {
         this.jdbcTemplate = jdbcTemplate;
-    }    /**
+    }
+    
+    /**
      * Получить все записи по serviceName из выбранной схемы
      */
     public List<TableMetadata> findByServiceName(String schema, String serviceName) {

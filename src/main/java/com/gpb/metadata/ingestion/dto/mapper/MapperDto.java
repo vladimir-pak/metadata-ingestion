@@ -76,7 +76,7 @@ public class MapperDto {
                     //         column.getDataLength()
                     // );
 
-                    String processedDataLength =column.getDataLength() == null ? "0" : column.getDataLength();
+                    String processedDataLength = column.getDataLength() == null ? "0" : column.getDataLength();
                     String precision = column.getPrecision() == null ? "0" : column.getPrecision();
                     String scale = column.getScale() == null ? "0" : column.getScale();
 
