@@ -1,6 +1,5 @@
 package com.gpb.metadata.ingestion.service;
 
-import com.gpb.metadata.ingestion.log.SvoiCustomLogger;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
@@ -10,6 +9,8 @@ import org.springframework.security.core.AuthenticationException;
 import org.springframework.security.web.AuthenticationEntryPoint;
 import org.springframework.stereotype.Component;
 
+import com.gpb.metadata.ingestion.cef.SvoiLogger;
+
 import java.io.IOException;
 import java.util.Base64;
 
@@ -18,7 +19,7 @@ import java.util.Base64;
 @RequiredArgsConstructor
 public class CustomAuthenticationEntryPoint implements AuthenticationEntryPoint {
 
-    private final SvoiCustomLogger svoiLogger;
+    private final SvoiLogger svoiLogger;
 
     @Override
     public void commence(HttpServletRequest request,

@@ -6,7 +6,7 @@ import org.springframework.security.core.Authentication;
 import org.springframework.security.web.authentication.WebAuthenticationDetails;
 import org.springframework.stereotype.Component;
 
-import com.gpb.metadata.ingestion.log.SvoiCustomLogger;
+import com.gpb.metadata.ingestion.cef.SvoiLogger;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -16,7 +16,7 @@ import lombok.extern.slf4j.Slf4j;
 @Slf4j
 public class AuthenticationSuccessEventListener implements ApplicationListener<AuthenticationSuccessEvent> {
 
-    private final SvoiCustomLogger svoiLogger;
+    private final SvoiLogger svoiLogger;
 
     @Override
     public void onApplicationEvent(AuthenticationSuccessEvent event) {

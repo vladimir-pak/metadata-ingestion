@@ -1,14 +1,16 @@
 package com.gpb.metadata.ingestion.service;
 
+import com.gpb.metadata.ingestion.enums.ServiceType;
+
 public interface MetadataHandlerService {
     void start(
-            String schemaName,
+            ServiceType serviceType,
             String serviceName,
             String runId
     );
 
     void startAsync(
-            String schemaName,
+            ServiceType serviceType,
             String serviceName,
             String runId
     );

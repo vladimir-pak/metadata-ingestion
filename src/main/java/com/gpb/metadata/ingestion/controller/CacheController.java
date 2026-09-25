@@ -1,18 +1,19 @@
 package com.gpb.metadata.ingestion.controller;
 
-import com.gpb.metadata.ingestion.log.SvoiCustomLogger;
-import com.gpb.metadata.ingestion.properties.MetadataSchemasProperties;
 import jakarta.servlet.http.HttpServletRequest;
+import jakarta.validation.Valid;
+
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.DeleteMapping;
-import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+import com.gpb.metadata.ingestion.cef.SvoiApiLog;
 import com.gpb.metadata.ingestion.dto.RequestBodyDto;
+import com.gpb.metadata.ingestion.enums.ServiceType;
 import com.gpb.metadata.ingestion.service.CacheService;
 import com.gpb.metadata.ingestion.service.IngestionMetricService;
 import com.gpb.metadata.ingestion.service.MetadataHandlerService;
@@ -29,66 +30,38 @@ import lombok.extern.slf4j.Slf4j;
 public class CacheController {
 
     private final MetadataHandlerService metadataHandlerService;
-    private final MetadataSchemasProperties schemasProperties;
     private final CacheService cacheService;
-    private final SvoiCustomLogger logger;
     private final IngestionMetricService ingestionMetricService;
 
-    @PostMapping("/start/postgres")
-    public ResponseEntity<String> startPostgres(@RequestBody RequestBodyDto body, HttpServletRequest request) {
-        logger.logApiCall(request, "startIngestionPostgres", body);
+    @PostMapping("/start")
+    @SvoiApiLog(functionName = "TriggerIngestion")
+    public ResponseEntity<String> startPostgres(
+            @Valid @RequestBody RequestBodyDto body,
+            HttpServletRequest request) {
         return startInternal(
-            schemasProperties.getPostgres(), 
+            body.getServiceType(), 
             body.getServiceName(),
             body.isAsync()
         );
     }
 
-    @PostMapping("/start/oracle")
-    public ResponseEntity<String> startOracle(@RequestBody RequestBodyDto body, HttpServletRequest request) {
-        logger.logApiCall(request, "startIngestionOracle", body);
-        return startInternal(
-            schemasProperties.getOracle(), 
-            body.getServiceName(),
-            body.isAsync()
-        );
-    }
-
-    @PostMapping("/start/mssql")
-    public ResponseEntity<String> startMssql(@RequestBody RequestBodyDto body, HttpServletRequest request) {
-        logger.logApiCall(request, "startIngestionMssql", body);
-        return startInternal(
-            schemasProperties.getMssql(), 
-            body.getServiceName(),
-            body.isAsync()
-        );
-    }
-
-    @PostMapping("/start/sapiq")
-    public ResponseEntity<String> startSapIq(@RequestBody RequestBodyDto body, HttpServletRequest request) {
-        logger.logApiCall(request, "startIngestionSapIq", body);
-        return startInternal(
-            schemasProperties.getSapiq(), 
-            body.getServiceName(),
-            body.isAsync()
-        );
-    }
-
-    @DeleteMapping("/clean/{schema}")
+    @DeleteMapping("/clean")
+    @SvoiApiLog(functionName = "CleanCache")
     public ResponseEntity<String> cleanCache(
         @RequestBody RequestBodyDto body, 
-        HttpServletRequest request, 
-        @PathVariable String schema
+        HttpServletRequest request
     ) {
-        logger.logApiCall(request, "cleanCache", body);
-        cacheService.cleanCache(schema, body.getServiceName());
+        cacheService.cleanCache(
+                body.getServiceType(), 
+                body.getServiceName()
+        );
         return ResponseEntity.ok(
-            String.format("Cache for %s from schema %s finished", body.getServiceName(), schema)
+            String.format("Cache for %s cleaned", body.getServiceName())
         );
     }
 
     private ResponseEntity<String> startInternal(
-            String schema,
+            ServiceType serviceType,
             String serviceName,
             boolean async) {
 
@@ -111,13 +84,13 @@ public class CacheController {
 
             if (async) {
                 metadataHandlerService.startAsync(
-                    schema,
+                    serviceType,
                     serviceName,
                     runId
                 );
             } else {
                 metadataHandlerService.start(
-                    schema,
+                    serviceType,
                     serviceName,
                     runId
                 );
@@ -128,7 +101,7 @@ public class CacheController {
                         "Ingestion run %s for %s from schema %s started",
                         runId,
                         serviceName,
-                        schema
+                        serviceType
                     )
             );
         } catch (IllegalArgumentException e) {

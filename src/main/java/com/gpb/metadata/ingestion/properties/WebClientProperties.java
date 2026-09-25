@@ -2,10 +2,12 @@ package com.gpb.metadata.ingestion.properties;
 
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.validation.annotation.Validated;
 
 import lombok.Getter;
 import lombok.Setter;
 
+@Validated 
 @Configuration
 @ConfigurationProperties(prefix = "ord.api")
 @Getter

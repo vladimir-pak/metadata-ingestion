@@ -15,10 +15,10 @@ import com.gpb.metadata.ingestion.dto.ColumnMetadataDto;
 import com.gpb.metadata.ingestion.dto.DatabaseMetadataDto;
 import com.gpb.metadata.ingestion.dto.SchemaMetadataDto;
 import com.gpb.metadata.ingestion.dto.TableMetadataDto;
+import com.gpb.metadata.ingestion.model.DatabaseMetadata;
 import com.gpb.metadata.ingestion.model.Metadata;
-import com.gpb.metadata.ingestion.model.postgres.DatabaseMetadata;
-import com.gpb.metadata.ingestion.model.postgres.SchemaMetadata;
-import com.gpb.metadata.ingestion.model.postgres.TableMetadata;
+import com.gpb.metadata.ingestion.model.SchemaMetadata;
+import com.gpb.metadata.ingestion.model.TableMetadata;
 import com.gpb.metadata.ingestion.model.schema.TableData;
 
 
@@ -59,7 +59,8 @@ public class MapperDto {
     }
 
     public TableMetadataDto mapToTableDto(TableMetadata meta, ServiceType serviceType) {
-        TableData tableData = meta.getTableData();
+        TableData tableData =
+                meta.getData();
         String processedTableType = TableTypes.map(tableData.getTableType());
 
         if (tableData.getColumns() == null) {
@@ -88,7 +89,7 @@ public class MapperDto {
                     return ColumnMetadataDto.builder()
                             .name(column.getName())
                             .dataType(processedDataType)
-                            .arrayDataType(resolveArrayType(column.getDataType(), processedDataType))
+                            .arrayDataType(resolveArrayType(column.getDataType(), processedDataType, serviceType))
                             .dataTypeDisplay(column.getDataTypeDisplay())
                             .dataLength(processedDataLength)
                             .precision(precision)
@@ -110,7 +111,10 @@ public class MapperDto {
                         log.debug("Constraint '{}' пропущен — не поддерживается Ордой",
                                 c.getConstraintType());
                     }
-                    if (c.getConstraintType().equals("FOREIGN_KEY") & c.getReferredColumns() == null) {
+                    if (
+                        "FOREIGN_KEY".equals(c.getConstraintType())
+                        && c.getReferredColumns() == null
+                    ) {
                         log.debug("Constraint '{}' пропущен — не найдены ссылки на внешние ключи",
                                 c.getConstraintType());
                         return false;
@@ -146,13 +150,18 @@ public class MapperDto {
         return dto;
     }
 
-    private String resolveArrayType(String sourceType, String processedType) {
+    private String resolveArrayType(
+            String sourceType,
+            String processedType,
+            ServiceType serviceType) {
+
         if (sourceType == null || !"ARRAY".equalsIgnoreCase(processedType)) {
             return null; // только для ARRAY
         }
 
         if (sourceType.endsWith("[]")) {
-            return sourceType.substring(0, sourceType.length() - 2).toUpperCase();
+            String elementType = sourceType.substring(0, sourceType.length() - 2);
+            return columnTypeMapperService.map(serviceType, elementType);
         }
 
         return null;

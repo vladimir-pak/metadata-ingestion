@@ -5,7 +5,10 @@ import lombok.Getter;
 import lombok.Setter;
 
 @Entity
-@Table(name = "users")
+@Table(
+        schema = "metadata_ingestion", 
+        name = "users"
+)
 @Getter
 @Setter
 public class UserEntity {

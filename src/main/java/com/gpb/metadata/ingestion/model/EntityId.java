@@ -1,25 +1,25 @@
 package com.gpb.metadata.ingestion.model;
 
+import java.io.Serial;
 import java.io.Serializable;
 
-import jakarta.persistence.Column;
-import jakarta.persistence.Embeddable;
-import lombok.Data;
+import lombok.AllArgsConstructor;
+import lombok.EqualsAndHashCode;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+import lombok.ToString;
 
-@Data
-@Embeddable
-public class EntityId implements Serializable{
-    @Column(name = "id")
+@Getter 
+@EqualsAndHashCode 
+@ToString 
+@NoArgsConstructor
+@AllArgsConstructor
+public class EntityId implements Serializable {
+
+    @Serial 
+    private static final long serialVersionUID = 1L;
+
     private Long id;
 
-    @Column(name = "parent_fqn")
     private String parentFqn;
-
-    public EntityId(Long id, String parentFqn) {
-        this.id = id;
-        this.parentFqn = parentFqn;
-    }
-
-    public EntityId() {
-    }
 }

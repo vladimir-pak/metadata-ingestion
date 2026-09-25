@@ -9,7 +9,10 @@ public enum TableTypes {
     SECUREVIEW("SecureView"),
     MATERIALIZED_VIEW("MaterializedView"),
     ICEBERG("Iceberg"),
-    LOCAL("Local");
+    LOCAL("Local"),
+    PARTITIONED("Partitioned"),
+    FOREIGN("Foreign"),
+    TRANSIENT("Transient");
 
     private final String targetType;
 
@@ -31,10 +34,10 @@ public enum TableTypes {
 
     public static String map(String source) {
         if (source == null || source.isEmpty()) {
-            return "UNKNOWN";
+            return null;
         }
         return Optional.ofNullable(LOOKUP.get(source.toUpperCase()))
                 .map(TableTypes::getTargetType)
-                .orElse("UNKNOWN");
+                .orElse(null);
     }
 }
