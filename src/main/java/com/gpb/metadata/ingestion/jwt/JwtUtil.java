@@ -106,46 +106,11 @@ public class JwtUtil {
         return generatedToken;
     }
 
-    public boolean validateToken(String token) {
+    public boolean validateToken(
+            String token) {
 
-        try {
-            Claims claims = parseClaims(token);
-
-            if (!SUBJECT.equals(claims.getSubject())) {
-                return false;
-            }
-
-            if (StringUtils.isBlank(claims.getId())) {
-                return false;
-            }
-
-            if (claims.getIssuedAt() == null) {
-                return false;
-            }
-
-            if (claims.getExpiration() == null) {
-                return false;
-            }
-
-            String service = claims.get(
-                    SERVICE_CLAIM,
-                    String.class
-            );
-
-            if (StringUtils.isBlank(service)) {
-                return false;
-            }
-
-            UUID jti = UUID.fromString(claims.getId());
-
-            return tokenRegistryRepository.isActive(
-                    jti,
-                    service
-            );
-
-        } catch (JwtException | IllegalArgumentException e) {
-            return false;
-        }
+        return validateAndGetService(token)
+                != null;
     }
 
     @Transactional
@@ -193,6 +158,69 @@ public class JwtUtil {
 
         if (!valid) {
             throw new JwtInvalidSecretException();
+        }
+    }
+
+    public String validateAndGetService(
+            String token) {
+
+        try {
+
+            Claims claims =
+                    parseClaims(token);
+
+            if (!SUBJECT.equals(
+                    claims.getSubject()
+            )) {
+                return null;
+            }
+
+            if (StringUtils.isBlank(
+                    claims.getId()
+            )) {
+                return null;
+            }
+
+            if (claims.getIssuedAt() == null) {
+                return null;
+            }
+
+            if (claims.getExpiration() == null) {
+                return null;
+            }
+
+            String service =
+                    claims.get(
+                            SERVICE_CLAIM,
+                            String.class
+                    );
+
+            if (StringUtils.isBlank(service)) {
+                return null;
+            }
+
+            UUID jti =
+                    UUID.fromString(
+                            claims.getId()
+                    );
+
+            boolean active =
+                    tokenRegistryRepository.isActive(
+                            jti,
+                            service
+                    );
+
+            if (!active) {
+                return null;
+            }
+
+            return service;
+
+        } catch (
+                JwtException
+                | IllegalArgumentException e) {
+
+            return null;
         }
     }
 }

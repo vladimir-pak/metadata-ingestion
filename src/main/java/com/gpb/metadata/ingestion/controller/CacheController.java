@@ -23,7 +23,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 
 @RestController
-@RequestMapping("/api/ingestion")
+@RequestMapping("/api/v1/ingestion")
 @RequiredArgsConstructor
 @Tag(name = "ingestion", description = "API запуска приема метаданных")
 @Slf4j
