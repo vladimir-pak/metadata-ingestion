@@ -149,6 +149,7 @@ public class SchemaMetadataCacheRepository
                 rs.getLong("id"),
                 rs.getString("parent_fqn")
         ));
+        entity.setParentFqn(rs.getString("parent_fqn"));
         entity.setFqn(rs.getString("fqn"));
         entity.setDbName(rs.getString("db_name"));
         entity.setName(rs.getString("name"));

@@ -158,6 +158,7 @@ public class TableMetadataCacheRepository
                 rs.getLong("id"),
                 rs.getString("parent_fqn")
         ));
+        entity.setParentFqn(rs.getString("parent_fqn"));
         entity.setFqn(rs.getString("fqn"));
         entity.setDbName(rs.getString("db_name"));
         entity.setSchemaName(rs.getString("schema_name"));

@@ -41,7 +41,8 @@ public class CacheController {
         return startInternal(
             body.getServiceType(), 
             body.getServiceName(),
-            body.isAsync()
+            body.isAsync(),
+            body.isSkipDeletionThreshold()
         );
     }
 
@@ -63,7 +64,8 @@ public class CacheController {
     private ResponseEntity<String> startInternal(
             ServiceType serviceType,
             String serviceName,
-            boolean async) {
+            boolean async,
+            boolean skipDeletionThreshold) {
 
         String runId = null;
         try {
@@ -86,13 +88,15 @@ public class CacheController {
                 metadataHandlerService.startAsync(
                     serviceType,
                     serviceName,
-                    runId
+                    runId,
+                    skipDeletionThreshold
                 );
             } else {
                 metadataHandlerService.start(
                     serviceType,
                     serviceName,
-                    runId
+                    runId,
+                    skipDeletionThreshold
                 );
             }
 

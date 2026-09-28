@@ -36,7 +36,7 @@ public class DatabaseMetadataCacheRepository
 
         String sql = """
                 SELECT id,
-                       parent_fqn,
+                       service_name,
                        fqn,
                        hash_data
                   FROM %s
@@ -51,7 +51,7 @@ public class DatabaseMetadataCacheRepository
                     while (rs.next()) {
                         EntityId id = new EntityId(
                                 rs.getLong("id"),
-                                rs.getString("parent_fqn")
+                                rs.getString("service_name")
                         );
 
                         MetadataFingerprint fingerprint = new MetadataFingerprint(
@@ -100,16 +100,16 @@ public class DatabaseMetadataCacheRepository
 
             String sql = """
                     SELECT m.id,
-                           m.parent_fqn,
+                           m.service_name as parent_fqn,
                            m.fqn,
                            m.name,
                            m.service_name,
                            m.hash_data,
                            m.created_at
                       FROM %s m
-                      JOIN (VALUES %s) AS v(id, parent_fqn)
+                      JOIN (VALUES %s) AS v(id, service_name)
                         ON m.id = v.id
-                       AND m.parent_fqn IS NOT DISTINCT FROM v.parent_fqn
+                       AND m.service_name IS NOT DISTINCT FROM v.service_name
                      WHERE m.service_name = ?
                     """.formatted(tableName, values);
 

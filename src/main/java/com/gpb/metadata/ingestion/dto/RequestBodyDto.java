@@ -16,4 +16,6 @@ public class RequestBodyDto {
     private ServiceType serviceType;
     
     private boolean async;
+
+    private boolean skipDeletionThreshold;
 }
