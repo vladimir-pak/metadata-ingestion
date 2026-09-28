@@ -807,17 +807,47 @@ public class MetadataHandlerServiceImpl implements MetadataHandlerService {
                 normalDeleteResult.errorCount() == 0
                 && orphanDeleteResult.errorCount() == 0;
 
-        if (!state.upsertPhaseSuccessful() || !deletePhaseSuccessful) {
+        /*
+        * DELETE reconciliation должен закончиться полностью.
+        *
+        * Неуспешный orphan delete невозможно представить
+        * через runtime cache, поэтому такой baseline нельзя
+        * считать готовым.
+        */
+        if (!deletePhaseSuccessful) {
+
             log.warn(
-                    "Reconciliation remains UNINITIALIZED. serviceType={}, " +
-                    "objectType={}, service={}, upsertOk={}, deleteOk={}",
+                    "Reconciliation remains UNINITIALIZED. "
+                            + "serviceType={}, objectType={}, service={}, "
+                            + "upsertOk={}, deleteOk=false",
                     serviceType,
                     cacheService.getDbObjectType(),
                     serviceName,
-                    state.upsertPhaseSuccessful(),
-                    deletePhaseSuccessful
+                    state.upsertPhaseSuccessful()
             );
+
             return;
+        }
+
+        /*
+        * Partial PUT допустим.
+        *
+        * В Ignite уже находятся только successfully applied
+        * source entities. Failed source IDs отсутствуют в cache
+        * и на следующем NORMAL run будут определены как NEW.
+        */
+        if (!state.upsertPhaseSuccessful()) {
+
+            log.warn(
+                    "Reconciliation completed with partial upserts. "
+                            + "serviceType={}, objectType={}, service={}, "
+                            + "committed={}. Failed entities will be retried "
+                            + "as NEW on next NORMAL run.",
+                    serviceType,
+                    cacheService.getDbObjectType(),
+                    serviceName,
+                    state.committedUpserts()
+            );
         }
 
         cacheService.markReconciliationComplete(
