@@ -129,7 +129,7 @@
 Запуск выполняется через:
 
 ```http
-POST /api/ingestion/start
+POST /api/v1/ingestion/start
 ```
 
 Пример:
@@ -715,7 +715,7 @@ text[]
 ## Запуск ingestion
 
 ```http
-POST /api/ingestion/start
+POST /api/v1/ingestion/start
 Content-Type: application/json
 Authorization: Basic ...
 ```
@@ -749,7 +749,7 @@ Body:
 Пример synchronous запуска:
 
 ```bash
-curl -X POST 'http://localhost:9900/api/ingestion/start' \
+curl -X POST 'http://localhost:9900/api/v1/ingestion/start' \
   -u admin:password \
   -H 'Content-Type: application/json' \
   -d '{
@@ -763,7 +763,7 @@ curl -X POST 'http://localhost:9900/api/ingestion/start' \
 Пример Bearer:
 
 ```bash
-curl -X POST 'http://localhost:9900/api/ingestion/start' \
+curl -X POST 'http://localhost:9900/api/v1/ingestion/start' \
   -H 'Authorization: Bearer <JWT>' \
   -H 'Content-Type: application/json' \
   -d '{
@@ -776,7 +776,7 @@ curl -X POST 'http://localhost:9900/api/ingestion/start' \
 ## Очистка cache
 
 ```http
-DELETE /api/ingestion/clean
+DELETE /api/v1/ingestion/clean
 ```
 
 Body:
@@ -833,7 +833,7 @@ curl -X DELETE \
 
 # Авторизация входящего API
 
-`/api/ingestion/**` поддерживает два альтернативных механизма:
+`/api/v1/ingestion/**` поддерживает два альтернативных механизма:
 
 ```text
 HTTP Basic
@@ -1378,7 +1378,7 @@ FULL RECONCILIATION repeats
 Endpoint:
 
 ```http
-DELETE /api/ingestion/clean
+DELETE /api/v1/ingestion/clean
 ```
 
 использует `CacheService.cleanCache()` для всех трёх типов:
@@ -1533,7 +1533,7 @@ SchemaMetadata.parentFqn
 
 Проверить текущую security chain:
 
-1. JWT filter должен обслуживать `/api/ingestion/**`.
+1. JWT filter должен обслуживать `/api/v1/ingestion/**`.
 2. При валидном JWT filter должен создать `Authentication` и записать его в `SecurityContext`.
 3. Отсутствие Bearer header не должно отклонять запрос — Basic должен получить возможность аутентифицировать его.
 4. JWT filter должен быть зарегистрирован внутри Spring Security chain до `BasicAuthenticationFilter`, а не выполняться дважды как servlet filter.
@@ -1609,7 +1609,7 @@ Hikari maximum-pool-size
 ```text
 1. Upstream replication обновляет metadata_replication.*
 
-2. POST /api/ingestion/start
+2. POST /api/v1/ingestion/start
 
 3. Service acquires advisory lock
 
