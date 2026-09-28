@@ -65,7 +65,7 @@ public class SecurityConfig {
                                  * Basic OR JWT Bearer.
                                  */
                                 .requestMatchers(
-                                        "/api/ingestion/**"
+                                        "/api/v1/ingestion/**"
                                 )
                                 .authenticated()
 
