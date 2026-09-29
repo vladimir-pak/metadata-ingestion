@@ -1274,7 +1274,7 @@ public class MetadataHandlerServiceImpl implements MetadataHandlerService {
                             .then(
                                     ordaClient.deleteRequest(
                                             deleteEndpoint + "/" + rename.oldFqn(),
-                                            true
+                                            false
                                     )
                             );
 
@@ -1319,7 +1319,7 @@ public class MetadataHandlerServiceImpl implements MetadataHandlerService {
                             id,
                             ordaClient.deleteRequest(
                                     endpoint + "/" + fqn,
-                                    true
+                                    false
                             ),
                             metric,
                             () -> log.debug(
@@ -1349,7 +1349,7 @@ public class MetadataHandlerServiceImpl implements MetadataHandlerService {
                 fqn -> trackFqnRequest(
                         ordaClient.deleteRequest(
                                 endpoint + "/" + fqn,
-                                true
+                                false
                         ),
                         metric,
                         () -> log.info(
@@ -1498,7 +1498,7 @@ public class MetadataHandlerServiceImpl implements MetadataHandlerService {
                             .then(
                                     ordaClient.deleteRequest(
                                             deleteEndpoint + "/" + rename.oldFqn(),
-                                            true
+                                            false
                                     )
                             );
 
@@ -1560,7 +1560,7 @@ public class MetadataHandlerServiceImpl implements MetadataHandlerService {
                             id,
                             ordaClient.deleteRequest(
                                     endpoint + "/" + fqn,
-                                    true
+                                    false
                             ),
                             metric,
                             () -> log.debug(
@@ -1591,7 +1591,7 @@ public class MetadataHandlerServiceImpl implements MetadataHandlerService {
                 fqn -> trackFqnRequest(
                             ordaClient.deleteRequest(
                                     endpoint + "/" + fqn,
-                                    true
+                                    false
                             ),
                             metric,
                             () -> log.info(
