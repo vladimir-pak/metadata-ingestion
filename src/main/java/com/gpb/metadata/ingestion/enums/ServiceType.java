@@ -1,5 +1,9 @@
 package com.gpb.metadata.ingestion.enums;
 
+import java.util.Locale;
+
+import com.fasterxml.jackson.annotation.JsonCreator;
+
 public enum ServiceType {
     POSTGRES("postgres"),
     MSSQL("mssql"),
@@ -15,5 +19,14 @@ public enum ServiceType {
     public String getValue() {
         return value;
     }
-}
 
+    @JsonCreator
+    public static ServiceType from(String value) {
+        if (value == null || value.isBlank()) {
+            return null;
+        }
+        return ServiceType.valueOf(
+                value.trim().toUpperCase(Locale.ROOT)
+        );
+    }
+}

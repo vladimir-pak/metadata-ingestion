@@ -1,36 +1,43 @@
 package com.gpb.metadata.ingestion.config;
 
+import javax.sql.DataSource;
+
+import com.zaxxer.hikari.HikariDataSource;
 import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.boot.autoconfigure.jdbc.DataSourceProperties;
+import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Primary;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.jdbc.core.JdbcTemplate;
-import org.springframework.jdbc.datasource.DriverManagerDataSource;
-
-import javax.sql.DataSource;
 
 @Configuration
 public class MainDbConfig {
 
-    @Bean
+    @Bean(name = "mainDataSourceProperties")
     @Primary
-    public DataSource mainDataSource(
-            @Value("${spring.datasource.url}") String url,
-            @Value("${spring.datasource.username}") String username,
-            @Value("${spring.datasource.password}") String password) {
+    @ConfigurationProperties("spring.datasource")
+    public DataSourceProperties mainDataSourceProperties() {
+        return new DataSourceProperties();
+    }
 
-        DriverManagerDataSource dataSource = new DriverManagerDataSource();
-        dataSource.setDriverClassName("org.postgresql.Driver");
-        dataSource.setUrl(url);
-        dataSource.setUsername(username);
-        dataSource.setPassword(password);
-        return dataSource;
+    @Bean(name = "mainDataSource")
+    @Primary
+    @ConfigurationProperties("spring.datasource.hikari")
+    public HikariDataSource mainDataSource(
+            @Qualifier("mainDataSourceProperties") DataSourceProperties properties) {
+
+        return properties
+                .initializeDataSourceBuilder()
+                .type(HikariDataSource.class)
+                .build();
     }
 
     @Bean(name = "jdbcTemplate")
     @Primary
-    public JdbcTemplate jdbcTemplate(@Qualifier("mainDataSource") DataSource dataSource) {
+    public JdbcTemplate jdbcTemplate(
+            @Qualifier("mainDataSource") DataSource dataSource) {
+
         return new JdbcTemplate(dataSource);
     }
 }

@@ -1,4 +1,11 @@
 # application.yml
+server:
+  port: 9900
+  tomcat:
+    max-connections: 100 # Максимальное количество соединений
+    accept-count: 100 # Максимальное количество потоков
+    threads:
+      max: 50 # Размер очереди запросов
 
 spring:
   application:
@@ -27,36 +34,41 @@ spring:
   jpa:
     hibernate:
       ddl-auto: none
-    show-sql: true
-    properties:
-      hibernate:
-        default_schema: postgres_metadata
-        dialect: org.hibernate.dialect.PostgreSQLDialect
-        jdbc:
-          lob:
-            non_contextual_creation: true
-        temp:
-          use_jdbc_metadata_defaults: false
+    show-sql: false
 
   flyway:
-    schemas: postgres_metadata
+    schemas: metadata_ingestion
     enabled: true
     locations: classpath:db/migration
     url: jdbc:postgresql://localhost:5432/meta_base
     user: postgres
     password: kampus
 
-  tomcat:
-    max-connections: 100 # Максимальное количество соединений
-    accept-count: 100 # Максимальное количество потоков
-    threads:
-      max: 50 # Размер очереди запросов
-
 ignite:
-  persistence:
-    storagePath: ./ignite/storage
-    walPath: ./ignite/wal
-    walArchivePath: ./ignite/wal-archive
+  client:
+    addresses:
+      - ${IGNITE_ADDRESS_1:ignite01:10800}
+      - ${IGNITE_ADDRESS_2:ignite02:10800}
+
+    username: ${IGNITE_USERNAME}
+    password: ${IGNITE_PASSWORD}
+
+    partition-awareness-enabled: true
+
+    ssl:
+      enabled: true
+
+      trust-store-path: ${IGNITE_TRUSTSTORE:/opt/app/certs/ignite-truststore.jks}
+      trust-store-password: ${IGNITE_TRUSTSTORE_PASSWORD}
+      trust-store-type: JKS
+
+      # Указываем, если server использует client-auth=true
+      key-store-path: ${IGNITE_KEYSTORE:/opt/app/certs/metadata-ingestion.jks}
+      key-store-password: ${IGNITE_KEYSTORE_PASSWORD}
+      key-store-type: JKS
+
+      key-algorithm: SunX509
+      trust-all: false
     
 ord:
   delete:
@@ -65,13 +77,20 @@ ord:
     url: ${DB_URL:jdbc:postgresql://localhost:5432/meta_base}
     username: ${DB_USER:postgres}
     password: ${DB_PASSWORD:kampus}
+    driverClassName: org.postgresql.Driver
+    hikari:
+      maximum-pool-size: 20
+      connection-timeout: 30000
+      idle-timeout: 600000
+      max-lifetime: 1800000
+      pool-name: TargetDBPool
   api:
     baseUrl: http://localhost:8585/api/v1
     endpoints:
       database: /databases
       schema: /databaseSchemas
       table: /tables
-    max-connections: 10 # Количество параллельно выполняемых api в ОРД
+    concurrency: 10 # Количество параллельно выполняемых api в ОРД
 
 keycloak:
   server-url: https://auth.example.com/realms/myrealm/protocol/openid-connect/token
@@ -81,7 +100,8 @@ keycloak:
   password: service-pass
 
 jwt:
-  token: eyJraWQiOiJHYjM4OWEtOWY3Ni1nZGpzLWE5MmotMDI0MmJrOTQzNTYiLCJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJvcGVuLW1ldGFkYXRhLm9yZyIsInN1YiI6ImFkbWluIiwiZW1haWwiOiJhZG1pbkBvcGVubWV0YWRhdGEub3JnIiwiaXNCb3QiOmZhbHNlLCJ0b2tlblR5cGUiOiJQRVJTT05BTF9BQ0NFU1MiLCJpYXQiOjE3NjA0Mzk3MDQsImV4cCI6bnVsbH0.on5MXkOV22bRcrK0KUiT9LqQQIc463BjTOXiz64UJyCJxoWMhd9KMu6r9w_8knHS7Zmf6HVuJw_VqYA1yXL2wOXZyF8bDutFd0YlQbhLZKxsh2aJ6bI8kxiEWbmhixESoEVQJ4Qa3lzBPY6SFsJdnS7N1rD8Kr13pM2szTnGcX98-ggO0gQFja4LecsHMBNCyFFuIZVIoHlyPA_-JirdxPxMIhmHGHbPXRAPI0gzsWXRIDx0lOhBsPbtXw6vnL0DYSa0NzYRgCMT9ouHhWuP6gbUXF-IFgPvAu_47qnWBldC9g9v7VW-YgbG7FiD1OPlMFgVtWtL7mL-wZrkA_54mA
+  secret: s356tgsf2u4tyuyg
+  expirationHours: 24000
 
 logs-database:
   enabled: true
@@ -98,19 +118,15 @@ clean-database-logs:
   # delete logs from db that older than X years
   clean-period: 3
 
-
 management:
   endpoints:
     web:
       exposure:
-        include: health,metrics,info
-    endpoint:
-      health:
-        show-details: always
-    metrics:
-      export:
-        prometheus:
-          enabled: true
+        include: health,metrics,info,prometheus
+
+  endpoint:
+    health:
+      show-details: always
 
 logging:
   cef:
@@ -134,9 +150,44 @@ logging:
       max-history: 7
 
 metadata:
-  schemas:
-    postgres: postgres_metadata
-    mssql: mssql_metadata
-    oracle: oracle_metadata
-    sapiq: sapiq_metadata
-    
+  cache:
+    # Thin Client scan page for normal delta comparison and v2 -> v3 migration.
+    scan-page-size: 4096
+
+    # putAll/removeAll chunk size. Keeps TLS payloads bounded.
+    commit-batch-size: 2000
+
+    # One backup is appropriate for a 2+ node persistent Ignite cluster.
+    backups: 1
+
+    # Full metadata loaded per cold-reconciliation batch.
+    reconciliation-batch-size: 5000
+
+    # ONE-TIME rollout switch. Keep true while upgrading v2 -> v3,
+    # then set false after all active services have a READY v3 manifest.
+    migrate-legacy-v2: false
+
+    # Keep v2 during rollout. Enable only after v3 is proven stable.
+    destroy-legacy-after-migration: false
+
+  tables:
+    sources:
+      postgres:
+        database: metadata_replication.database_metadata_postgres
+        schema: metadata_replication.schema_metadata_postgres
+        table: metadata_replication.table_metadata_postgres
+
+      mssql:
+        database: metadata_replication.database_metadata_mssql
+        schema: metadata_replication.schema_metadata_mssql
+        table: metadata_replication.table_metadata_mssql
+
+      oracle:
+        database: metadata_replication.database_metadata_oracle
+        schema: metadata_replication.schema_metadata_oracle
+        table: metadata_replication.table_metadata_oracle
+
+      sapiq:
+        database: metadata_replication.database_metadata_sapiq
+        schema: metadata_replication.schema_metadata_sapiq
+        table: metadata_replication.table_metadata_sapiq
