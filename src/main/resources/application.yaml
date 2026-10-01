@@ -150,6 +150,8 @@ logging:
       max-history: 7
 
 metadata:
+  metric:
+    create-partition-schedule: 0 0 0 1 * *
   cache:
     # Thin Client scan page for normal delta comparison and v2 -> v3 migration.
     scan-page-size: 4096

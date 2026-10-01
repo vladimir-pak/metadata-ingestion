@@ -25,7 +25,7 @@ public class SvoiJournalFactory {
     
     @Value("${server.port}")
     private Integer localPort;
-    @Value("${spring.application.project-name:mkad}")
+    @Value("${spring.application.project-name}")
     private String projectName;
     private String localHostName;
     private Long journalLineNumber = 0L;
