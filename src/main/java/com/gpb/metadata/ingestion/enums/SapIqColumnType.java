@@ -75,7 +75,15 @@ public enum SapIqColumnType implements OrdaColumnTypeMapper {
     XML("XML"),
     JSON("JSON"),
     NULL("NULL"),
-    UNKNOWN("UNKNOWN");
+    UNKNOWN("UNKNOWN"),
+
+    // SAP ASE
+    UNICHAR("CHAR"),
+    UNIVARCHAR("VARCHAR"),
+    UNITEXT("TEXT"),
+    SMALLDATETIME("DATETIME"),
+    SYSNAME("VARCHAR"),
+    LONGSYSNAME("VARCHAR");
 
     private final String targetType;
 
@@ -172,6 +180,14 @@ public enum SapIqColumnType implements OrdaColumnTypeMapper {
         putAlias("xml", XML);
         putAlias("json", JSON);
         putAlias("null", NULL);
+
+        // SAP ASE
+        putAlias("unichar", UNICHAR);
+        putAlias("univarchar", UNIVARCHAR);
+        putAlias("unitext", UNITEXT);
+        putAlias("smalldatetime", SMALLDATETIME);
+        putAlias("sysname", SYSNAME);
+        putAlias("longsysname", LONGSYSNAME);
     }
 
     public static String map(String source) {

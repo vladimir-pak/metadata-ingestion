@@ -13,6 +13,7 @@ public class ColumnTypeMapperService {
             case POSTGRES -> PostgresColumnType.map(sourceType);
             case ORACLE -> OracleOrdaColumnType.map(sourceType);
             case SAPIQ -> SapIqColumnType.map(sourceType);
+            case SAPASE -> SapIqColumnType.map(sourceType);
         };
     }
 }

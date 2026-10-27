@@ -8,7 +8,8 @@ public enum ServiceType {
     POSTGRES("postgres"),
     MSSQL("mssql"),
     ORACLE("oracle"),
-    SAPIQ("sapiq");
+    SAPIQ("sapiq"),
+    SAPASE("sapase");
 
     private final String value;
 
