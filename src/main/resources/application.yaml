@@ -193,3 +193,8 @@ metadata:
         database: metadata_replication.database_metadata_sapiq
         schema: metadata_replication.schema_metadata_sapiq
         table: metadata_replication.table_metadata_sapiq
+
+      sapase:
+        database: metadata_replication.database_metadata_sapase
+        schema: metadata_replication.schema_metadata_sapase
+        table: metadata_replication.table_metadata_sapase

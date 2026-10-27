@@ -35,7 +35,7 @@ public class CacheController {
 
     @PostMapping("/start")
     @SvoiApiLog(functionName = "TriggerIngestion")
-    public ResponseEntity<String> startPostgres(
+    public ResponseEntity<String> start(
             @Valid @RequestBody RequestBodyDto body,
             HttpServletRequest request) {
         return startInternal(
