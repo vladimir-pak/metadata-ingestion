@@ -154,10 +154,13 @@ public class TableMetadataCacheRepository
             int rowNum) throws SQLException {
 
         TableMetadata entity = new TableMetadata();
-        entity.setId(new EntityId(
-                rs.getLong("id"),
-                rs.getString("parent_fqn")
-        ));
+        
+        entity.setId(
+                new EntityId(
+                        rs.getLong("id"),
+                        rs.getString("parent_fqn")
+                )
+        );
         entity.setParentFqn(rs.getString("parent_fqn"));
         entity.setFqn(rs.getString("fqn"));
         entity.setDbName(rs.getString("db_name"));

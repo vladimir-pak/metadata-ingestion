@@ -1,7 +1,6 @@
 package com.gpb.metadata.ingestion.dto;
 
-import com.fasterxml.jackson.annotation.JsonProperty;
-import com.gpb.metadata.ingestion.enums.TypesWithDataLength;
+import com.fasterxml.jackson.annotation.JsonInclude;
 
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -12,41 +11,20 @@ import lombok.NoArgsConstructor;
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
+@JsonInclude(JsonInclude.Include.NON_NULL)
 public class ColumnMetadataDto {
-    @JsonProperty("name")
+
     private String name;
-
-    @JsonProperty("dataType")
     private String dataType;
-
-    @JsonProperty("dataTypeDisplay")
     private String dataTypeDisplay;
 
-    @JsonProperty("dataLength")
-    private String dataLength;
+    private int dataLength;
+    private int precision;
+    private int ordinalPosition;
+    private int scale;
 
-    @JsonProperty("precision")
-    private String precision;
-
-    @JsonProperty("scale")
-    private String scale;
-
-    @JsonProperty("description")
     private String description;
-
-    @JsonProperty("ordinalPosition")
-    private String ordinalPosition;
-
-    @JsonProperty("constraint")
     private String constraint;
-
-    @JsonProperty("arrayDataType")
     private String arrayDataType;
 
-    /*
-     * setter-заглушка с проверкой обязательности заполнения dataLength. Если пусто, то 0
-     */
-    public void setDataLength(String dataLength) {
-        this.dataLength = TypesWithDataLength.getProcessedDataLength(this.dataType, dataLength);
-    }
 }

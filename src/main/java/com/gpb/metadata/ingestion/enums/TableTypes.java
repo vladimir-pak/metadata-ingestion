@@ -12,6 +12,8 @@ public enum TableTypes {
     LOCAL("Local"),
     PARTITIONED("Partitioned"),
     FOREIGN("Foreign"),
+    DYNAMIC("Dynamic"),
+    STREAM("Stream"),
     TRANSIENT("Transient");
 
     private final String targetType;

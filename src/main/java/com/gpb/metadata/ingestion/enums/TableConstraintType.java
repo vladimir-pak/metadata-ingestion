@@ -2,7 +2,7 @@ package com.gpb.metadata.ingestion.enums;
 
 import java.util.Set;
 
-public enum ConstraintType {
+public enum TableConstraintType {
 
     UNIQUE,
     PRIMARY_KEY,
@@ -10,14 +10,14 @@ public enum ConstraintType {
     SORT_KEY,
     DIST_KEY,
     UNKNOWN;
-    private static final Set<ConstraintType> SUPPORTED = Set.of(
+    private static final Set<TableConstraintType> SUPPORTED = Set.of(
             UNIQUE, PRIMARY_KEY, FOREIGN_KEY, SORT_KEY, DIST_KEY
     );
 
-    public static ConstraintType fromString(String type) {
+    public static TableConstraintType fromString(String type) {
         if (type == null) return UNKNOWN;
         try {
-            return ConstraintType.valueOf(type.trim().toUpperCase());
+            return TableConstraintType.valueOf(type.trim().toUpperCase());
         } catch (IllegalArgumentException e) {
             return UNKNOWN;
         }

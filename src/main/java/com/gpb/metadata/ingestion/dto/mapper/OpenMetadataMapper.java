@@ -1,6 +1,7 @@
 package com.gpb.metadata.ingestion.dto.mapper;
 
 import java.util.List;
+import java.util.Locale;
 import java.util.Optional;
 import java.util.stream.Collectors;
 
@@ -9,6 +10,8 @@ import com.gpb.metadata.ingestion.model.schema.TableConstraints;
 import com.gpb.metadata.ingestion.service.impl.ColumnTypeMapperService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Configuration;
 
 import com.gpb.metadata.ingestion.dto.ColumnMetadataDto;
@@ -25,19 +28,38 @@ import com.gpb.metadata.ingestion.model.schema.TableData;
 @Slf4j
 @Configuration
 @RequiredArgsConstructor
-public class MapperDto {
+@ConditionalOnProperty(
+    prefix = "metadata",
+    name = "version",
+    havingValue = "1.9.4"
+)
+public class OpenMetadataMapper implements OpenMetadataRequestMapper  {
 
     private final ColumnTypeMapperService columnTypeMapperService;
 
-    public Object getDto(DbObjectType dbObjectType, Metadata metadata, ServiceType serviceType) {
+    public Object getDto(
+            DbObjectType dbObjectType, 
+            Metadata metadata, 
+            ServiceType serviceType) {
         return switch (dbObjectType) {
-            case DATABASE -> mapToDatabaseDto((DatabaseMetadata) metadata);
-            case SCHEMA -> mapToSchemaDto((SchemaMetadata) metadata);
-            case TABLE -> mapToTableDto((TableMetadata) metadata, serviceType);
+
+            case DATABASE -> mapToDatabaseDto(
+                    (DatabaseMetadata) metadata
+            );
+
+            case SCHEMA -> mapToSchemaDto(
+                    (SchemaMetadata) metadata
+            );
+
+            case TABLE -> mapToTableDto(
+                    (TableMetadata) metadata, 
+                    serviceType
+            );
         };
     }
 
-    public DatabaseMetadataDto mapToDatabaseDto(DatabaseMetadata meta) {
+    private DatabaseMetadataDto mapToDatabaseDto(
+            DatabaseMetadata meta) {
         return DatabaseMetadataDto.builder()
                 .name(meta.getName())
                 .displayName(meta.getName())
@@ -45,7 +67,7 @@ public class MapperDto {
                 .build();
     }
 
-    public SchemaMetadataDto mapToSchemaDto(SchemaMetadata meta) {
+    private SchemaMetadataDto mapToSchemaDto(SchemaMetadata meta) {
         SchemaMetadataDto dto = SchemaMetadataDto.builder()
                 .name(meta.getName())
                 .displayName(meta.getName())
@@ -58,38 +80,72 @@ public class MapperDto {
         return dto;
     }
 
-    public TableMetadataDto mapToTableDto(TableMetadata meta, ServiceType serviceType) {
-        TableData tableData =
-                meta.getData();
-        String processedTableType = TableTypes.map(tableData.getTableType());
+    private TableMetadataDto mapToTableDto(
+            TableMetadata meta, 
+            ServiceType serviceType) {
+
+        TableData tableData = meta.getData();
+
+        String processedTableType = 
+                TableTypes.map(
+                        tableData.getTableType()
+                );
 
         if (tableData.getColumns() == null) {
-            log.error("Ошибка при обработке Table {}: columns is null", meta.getFqn());
+            log.error(
+                    "Ошибка при обработке Table {}: columns is null", 
+                    meta.getFqn()
+            );
             return null;
         }
 
         List<ColumnMetadataDto> columns = tableData.getColumns().stream()
                 .map(column -> {
-                    String processedDataType = columnTypeMapperService.map(serviceType, column.getDataType());
+                    String processedDataType = 
+                            columnTypeMapperService.map(
+                                    serviceType, 
+                                    column.getDataType()
+                            );
 
-                    // String processedDataLength = TypesWithDataLength.getProcessedDataLength(
-                    //         processedDataType,
-                    //         column.getDataLength()
-                    // );
-
-                    String processedDataLength = column.getDataLength() == null ? "0" : column.getDataLength();
-                    String precision = column.getPrecision() == null ? "0" : column.getPrecision();
-                    String scale = column.getScale() == null ? "0" : column.getScale();
-
+                    int processedDataLength = column.getDataLength();
+                    int precision =  column.getPrecision();
+                    int scale = column.getScale();
                     String constraint = column.getConstraint();
-                    if ("NULLABLE".equalsIgnoreCase(constraint)) {
-                        constraint = null;
+
+                    if (constraint != null) {
+                        constraint = constraint.trim();
+
+                        if ("NULLABLE".equalsIgnoreCase(constraint)
+                                || constraint.isBlank()) {
+
+                            constraint = null;
+
+                        } else if (!ColumnConstraintType.isSupported(constraint)) {
+
+                            log.warn(
+                                "Unsupported ColumnConstraint '{}' for column '{}', table '{}'",
+                                constraint,
+                                column.getName(),
+                                meta.getFqn()
+                            );
+
+                            constraint = null;
+
+                        } else {
+                            constraint = constraint.toUpperCase(Locale.ROOT);
+                        }
                     }
 
                     return ColumnMetadataDto.builder()
                             .name(column.getName())
                             .dataType(processedDataType)
-                            .arrayDataType(resolveArrayType(column.getDataType(), processedDataType, serviceType))
+                            .arrayDataType(
+                                    resolveArrayType(
+                                            column.getDataType(), 
+                                            processedDataType, 
+                                            serviceType
+                                    )
+                            )
                             .dataTypeDisplay(column.getDataTypeDisplay())
                             .dataLength(processedDataLength)
                             .precision(precision)
@@ -106,16 +162,16 @@ public class MapperDto {
                 .orElseGet(List::of)
                 .stream()
                 .filter(c -> {
-                    boolean keep = ConstraintType.isSupported(c.getConstraintType());
+                    boolean keep = TableConstraintType.isSupported(c.getConstraintType());
                     if (!keep) {
-                        log.debug("Constraint '{}' пропущен — не поддерживается Ордой",
+                        log.warn("TableConstraint '{}' пропущен — не поддерживается Ордой",
                                 c.getConstraintType());
                     }
                     if (
                         "FOREIGN_KEY".equals(c.getConstraintType())
-                        && c.getReferredColumns() == null
+                                && c.getReferredColumns() == null
                     ) {
-                        log.debug("Constraint '{}' пропущен — не найдены ссылки на внешние ключи",
+                        log.debug("TableConstraint '{}' пропущен — не найдены ссылки на внешние ключи",
                                 c.getConstraintType());
                         return false;
                     }
@@ -128,7 +184,7 @@ public class MapperDto {
                 .displayName(meta.getName())
                 .tableType(processedTableType)
                 .isProjectEntity(false)
-                .viewDefinition(tableData.getViewDefinition())
+                .schemaDefinition(tableData.getViewDefinition())
                 .databaseSchema(meta.getParentFqn())
                 .description(meta.getDescription())
                 .columns(columns)
@@ -137,6 +193,7 @@ public class MapperDto {
         
         String dbName = meta.getDbName();
         String schemaName = meta.getSchemaName();
+
         if (meta.getDbName().contains(".")) {
             dbName = String.format("\"%s\"", meta.getDbName());
         }
@@ -145,7 +202,14 @@ public class MapperDto {
             schemaName = String.format("\"%s\"", meta.getSchemaName());
         }
         
-        dto.setDatabaseSchema(String.format("%s.%s.%s", meta.getServiceName(), dbName, schemaName));
+        dto.setDatabaseSchema(
+                String.format(
+                        "%s.%s.%s", 
+                        meta.getServiceName(), 
+                        dbName, 
+                        schemaName
+                )
+        );
 
         return dto;
     }
@@ -160,7 +224,11 @@ public class MapperDto {
         }
 
         if (sourceType.endsWith("[]")) {
-            String elementType = sourceType.substring(0, sourceType.length() - 2);
+            String elementType = 
+                    sourceType.substring(
+                            0, 
+                            sourceType.length() - 2
+                    );
             return columnTypeMapperService.map(serviceType, elementType);
         }
 

@@ -150,6 +150,8 @@ logging:
       max-history: 7
 
 metadata:
+  version: ${METADATA_VERSION:1.9.4}
+
   metric:
     create-partition-schedule: 0 0 0 1 * *
   cache:

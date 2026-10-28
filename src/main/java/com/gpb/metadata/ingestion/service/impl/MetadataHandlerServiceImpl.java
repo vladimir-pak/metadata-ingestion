@@ -15,7 +15,7 @@ import com.gpb.metadata.ingestion.cache.CacheComparisonResult;
 import com.gpb.metadata.ingestion.cache.dto.MetadataFingerprint;
 import com.gpb.metadata.ingestion.cache.dto.MetadataRename;
 import com.gpb.metadata.ingestion.dto.DatabaseServiceMetadataDto;
-import com.gpb.metadata.ingestion.dto.mapper.MapperDto;
+import com.gpb.metadata.ingestion.dto.mapper.OpenMetadataRequestMapper;
 import com.gpb.metadata.ingestion.enums.DbObjectType;
 import com.gpb.metadata.ingestion.enums.ServiceType;
 import com.gpb.metadata.ingestion.exceptions.TokenRefreshException;
@@ -54,7 +54,7 @@ public class MetadataHandlerServiceImpl implements MetadataHandlerService {
     private final SchemaMetadataCacheServiceImpl schemaCacheService;
     private final TableMetadataCacheServiceImpl tableCacheService;
 
-    private final MapperDto mapperDto;
+    private final OpenMetadataRequestMapper mapperDto;
     private final ObjectMapper objectMapper;
     private final WebClientProperties webClientProperties;
     private final OrdaClient ordaClient;

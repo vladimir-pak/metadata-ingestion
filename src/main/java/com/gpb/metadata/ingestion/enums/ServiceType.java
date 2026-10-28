@@ -18,6 +18,7 @@ public enum ServiceType {
     }
 
     public String getValue() {
+        if ("sapase".equals(value)) return "sapiq";
         return value;
     }
 

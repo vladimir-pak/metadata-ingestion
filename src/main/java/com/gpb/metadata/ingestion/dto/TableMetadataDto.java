@@ -2,6 +2,7 @@ package com.gpb.metadata.ingestion.dto;
 
 import java.util.List;
 
+import com.fasterxml.jackson.annotation.JsonInclude;
 import com.gpb.metadata.ingestion.model.schema.TableConstraints;
 
 import lombok.AllArgsConstructor;
@@ -13,6 +14,7 @@ import lombok.NoArgsConstructor;
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
+@JsonInclude(JsonInclude.Include.NON_NULL)
 public class TableMetadataDto implements MetadataDto {
     private String name;
     private String displayName;
@@ -20,7 +22,7 @@ public class TableMetadataDto implements MetadataDto {
     private String description;
     private String tableType;
     private Boolean isProjectEntity;
-    private String viewDefinition;
+    private String schemaDefinition;
     private List<ColumnMetadataDto> columns;
     private List<TableConstraints> tableConstraints;
 }

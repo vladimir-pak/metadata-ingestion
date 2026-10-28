@@ -1,6 +1,8 @@
 package com.gpb.metadata.ingestion.model.schema;
 
-import com.fasterxml.jackson.annotation.JsonProperty;
+import com.fasterxml.jackson.annotation.JsonInclude;
+import com.fasterxml.jackson.annotation.JsonSetter;
+import com.fasterxml.jackson.annotation.Nulls;
 
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -11,31 +13,27 @@ import lombok.NoArgsConstructor;
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
+@JsonInclude(JsonInclude.Include.NON_NULL)
 public class ColumnData {
-    @JsonProperty("name")
+
     private String name;
-
-    @JsonProperty("dataType")
     private String dataType;
-
-    @JsonProperty("dataTypeDisplay")
     private String dataTypeDisplay;
 
-    @JsonProperty("dataLength")
-    private String dataLength;
+    @Builder.Default
+    @JsonSetter(nulls = Nulls.SKIP)
+    private int dataLength = 0;
 
-    @JsonProperty("precision")
-    private String precision;
+    @Builder.Default
+    @JsonSetter(nulls = Nulls.SKIP)
+    private int precision = 0;
 
-    @JsonProperty("scale")
-    private String scale;
+    @Builder.Default
+    @JsonSetter(nulls = Nulls.SKIP)
+    private int scale = 0;
 
-    @JsonProperty("description")
+    private int ordinalPosition;
+
     private String description;
-
-    @JsonProperty("ordinalPosition")
-    private String ordinalPosition;
-
-    @JsonProperty("constraint")
     private String constraint;
 }
