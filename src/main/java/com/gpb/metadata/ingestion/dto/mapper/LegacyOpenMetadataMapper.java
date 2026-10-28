@@ -12,9 +12,6 @@ import com.gpb.metadata.ingestion.service.impl.ColumnTypeMapperService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 
-import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
-import org.springframework.context.annotation.Configuration;
-
 import com.gpb.metadata.ingestion.dto.legacy.ColumnMetadataDto;
 import com.gpb.metadata.ingestion.dto.DatabaseMetadataDto;
 import com.gpb.metadata.ingestion.dto.SchemaMetadataDto;
@@ -27,13 +24,7 @@ import com.gpb.metadata.ingestion.model.schema.TableData;
 
 
 @Slf4j
-@Configuration
 @RequiredArgsConstructor
-@ConditionalOnProperty(
-    prefix = "metadata",
-    name = "version",
-    havingValue = "1.2.3"
-)
 public class LegacyOpenMetadataMapper implements OpenMetadataRequestMapper {
 
     private final ColumnTypeMapperService columnTypeMapperService;
